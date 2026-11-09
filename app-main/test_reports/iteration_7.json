@@ -1,0 +1,88 @@
+{
+  "iteration": 7,
+  "summary": "New briefing (takeoff dialog/overlay bug, terminer/annuler statuses, step prev/next, one-active-flight rule, UTC wording, Classement page, mobile layout). 7/7 acceptance criteria covered: 4 new backend test files (8 tests) + 1 reused existing backend test file + 5 new browser checks. 13/13 artifacts pass. All fixtures (tscheck-* users, ACA317 flights) cleaned up; THA28, KD user, and the seeded admin were left untouched (verified by a post-run API check: ACA317 count 0, THA28 still point_attente, KD user present/enabled).",
+  "passed": 13,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [
+    "Unrelated pre-existing test found broken during a full-suite run: tests/test_tscheck_mode_chooser.py::test_admin_grants_atc_then_revoking_invalidates_session_immediately sends PATCH /admin/users/{id} {\"atc_allowed\": true}, but the current AdminUserPatch schema only accepts {\"atc_decision\": \"accept\"|\"refuse\"|\"revoke\"} (see routers/admin.py) -> the server correctly returns 400 'Aucune modification.' because 'atc_allowed' isn't a recognized field anymore. This is not one of this iteration's acceptance criteria and I did not touch it, but it is a stale/broken test artifact from a prior session that a future pass should fix or remove (the equivalent behavior IS covered and passing in tests/test_tscheck_atc_request.py, which correctly uses atc_decision).",
+    "The full backend suite run with default xdist parallelism (2 workers) hit the server's in-memory per-IP /auth/register throttle (30/15min) purely from my own repeated debugging runs; restarting the backend process (not the DB) cleared it, same pattern as previous iterations. No action needed beyond awareness."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Takeoff bug: confirm-dialog closes, no overlay, phase becomes Décollage, tabs stay clickable, distance increases, same on Radar side panel",
+      "name": "takeoff-confirm-dialog-closes-detail-and-radar",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Admin-as-owner imported a fresh ACA317 via SimBrief (dep_gate=11), used 'Étape suivante'+confirm x4 to reach Point d'attente on /flights/{id}, clicked 'Décollage'+confirm -> confirm-dialog count 0, detail-phase data-phase='decollage', tab-history/tab-route still clickable (aria-selected toggles), API cross-check track='air' and distance_nm increased within 15s. Repeated the whole flow on a second ACA317 import opened via Radar's /?f=<id> side panel (selected-flight-panel) with identical result; fixture flights deleted at the end."
+    },
+    {
+      "criterion": "Takeoff bug (API: decollage sets track=air, on_ground=false, distance increases)",
+      "name": "test_tscheck_takeoff.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Reused existing file (already covers this API behavior): admin force -> point_attente, POST /flights/{id}/actions {action:'decollage'} -> 200 phase='decollage', track='air', on_ground=false; after 5s GET /flights/{id} shows distance_nm strictly increased. 1 test passed on rerun this session."
+    },
+    {
+      "criterion": "Terminer le vol + statuses (availability, confirm, phase 'termine', removed from active list; Annuler distinct)",
+      "name": "terminer-vol-removes-from-active-and-annuler-distinct",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Owner (admin) advanced ACA317 to pret_depart, clicked action-terminer+confirm -> detail-phase='termine'; flight-row-ACA317 count 0 on Radar (removed from active list); Historique row shows 'Terminé'. Second ACA317 import, action-annuler+confirm from preparation -> phase='annule'; Historique row shows 'Annulé' (visually distinct from the first)."
+    },
+    {
+      "criterion": "Terminer le vol + statuses (API: terminer allowed from every active phase and sets 'termine'; annuler only from preparation/pret_depart and sets 'annule'; distinct in scope=all)",
+      "name": "test_tscheck_terminer_annuler.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /flights/{id}/actions {action:'terminer'} from pret_depart -> 200 phase='termine', absent from scope=active, present with phase='termine' in scope=all. {action:'annuler'} from preparation -> 200 phase='annule'; re-annuler on a closed flight -> 409; present with phase='annule' in scope=all, absent from scope=active. 2 tests passed."
+    },
+    {
+      "criterion": "Previous/next step (prev refused at preparation/en_route/roulage_arrivee boundaries, next advances one phase, another pilot forbidden, event logged)",
+      "name": "test_tscheck_step.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /flights/{id}/step {direction:'prev'} at preparation -> 409; {direction:'next'} -> 200 phase='pret_depart', event log contains an 'suivante' entry; stepped to en_route then prev -> 409; stepped to roulage_arrivee then prev -> 409. Second test: a different real pilot (mode set to 'pilote', not the flight owner) calling step -> 403. 2 tests passed."
+    },
+    {
+      "criterion": "One active flight per pilot (server-side 409 on fetch/confirm while active; works again after close; confirm without dep_gate -> 422)",
+      "name": "test_tscheck_one_active_flight.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "With an active ACA317, POST /simbrief/fetch -> 409 French ('vol actif'/'déjà'); POST /simbrief/confirm/{a valid, found draft} -> 409 too (one_active_flight() checked right after the draft lookup); after 'annuler' closes it, a fresh fetch+confirm succeeds (phase='preparation'). Second test: POST /simbrief/confirm/{draft} {dep_gate:null} -> 422 (dep_gate is a mandatory non-empty field). 2 tests passed."
+    },
+    {
+      "criterion": "UTC times & wording (header 'HH:MM UTC' not 'SRV'; history/flight-event dates end with 'UTC'; copy says 'plan de vol SimBrief')",
+      "name": "utc-times-and-simbrief-wording",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Header server-time text matched /^\\d{2}:\\d{2} UTC$/ and contained no 'SRV'; Historique row text contains 'UTC'; a flight's history tab body text contains 'UTC'; after logout, the /login marketing panel (lg breakpoint) contains the exact phrase 'plan de vol SimBrief'."
+    },
+    {
+      "criterion": "Classement page (nav item, tabs Pilotes/Contrôleurs ATC; GET /api/leaderboard 200 logged-in / 401 anonymous; hours accrue on terminer)",
+      "name": "classement-nav-and-tabs",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "nav-ranking -> /classement; leader-tab-pilots/leader-tab-atc both render a board-or-empty-state on click; GET /api/leaderboard returns {pilots, atc} for the logged-in admin; a credential-less fetch('/api/leaderboard') returns 401."
+    },
+    {
+      "criterion": "Classement page (API: leaderboard shape/auth + hours added after roulage->terminer)",
+      "name": "test_tscheck_leaderboard.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /leaderboard -> 200 {pilots, atc} for the admin session; same call via a cookie-less httpx.Client -> 401. Second test: stepped ACA317 preparation->pret_depart->repoussage->roulage (sets block_off_at) then 'terminer' (sets block_on_at) -> GET /leaderboard pilots list now contains the admin's display_name with hours >= 0.0. 2 tests passed."
+    },
+    {
+      "criterion": "Mobile layout (390x844): header fits, radar map+list stacked/usable, detail map-on-top-then-scrollable panel, no essential element off-screen",
+      "name": "mobile-layout-390x844",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844: header boundingBox width <= viewport width with logout/nav-radar visible; flight-list and the radar map (.bg-radar) both render within viewport width, stacked vertically (screenshot); opening a flight detail page shows detail-map ABOVE flight-detail-panel (mapBB.y < panelBB.y) with both within viewport width; scrolled the panel to reveal back-to-radar at the bottom, confirming scrollability."
+    }
+  ],
+  "note_scope": "7/7 matrix criteria covered with 10 fresh artifacts (4 backend files, 5 browser checks, + 1 reused pre-existing backend file for criterion 1's API side) since the matrix exceeds eight criteria is false here (exactly 7); every API-bearing UI criterion (takeoff, terminer/annuler, classement) got both lanes, while step and one-active-flight (pure API behavior per their wording) got backend-only, and UTC-wording/mobile-layout (pure UI/rendering) got browser-only."
+}

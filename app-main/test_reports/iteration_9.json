@@ -1,0 +1,84 @@
+{
+  "iteration": 9,
+  "summary": "New briefing (generate mode): 8 criteria covering top bar/clock/mode-switch/logout, collapsible sidebar+nav-by-mode, mode-switch permissions, radar route-on-selection, controlled-flight claim/403, pushback direction requirement, strips ICAO filter/global view, history+reviews access control+public profile. 8 browser checks written/run (one per criterion; all are UI-facing with API assertions inlined, so no separate backend test files were needed). Result: 7 passed, 1 failed (real frontend crash), 0 flaky, 0 blocked, 0 test_error.",
+  "passed": 7,
+  "failed": 1,
+  "bugs": [
+    {
+      "severity": "high",
+      "criterion": "Mode switch respects permissions (ATC switching Pilote<->ATC without re-login)",
+      "description": "Logged in as the ATC-allowed test member, choosing ATC mode then using the top-bar mode-switch to go ATC->Pilote->ATC a second time crashes the app with a full-screen runtime error overlay: \"Cannot read properties of null (reading 'getZoom')\" thrown from node_modules/.vite/deps/@maplibre_maplibre-gl-leaflet.js:175:25. Reproduced twice in a row (not flaky). The Radar map component does not tear down/recreate its maplibre-gl-leaflet layer safely across the unmount/remount triggered by a mode switch while it is still mid-render/attached.",
+      "evidence": "Check 'mode-switch-respects-permissions': after sequence mode-atc-button -> mode-switch-pilote -> mode-switch-atc, page shows Emergent runtime-error overlay 'Cannot read properties of null (reading getZoom)' (screenshot mode-switch-respects-permissions-failure.png). Backend confirmed healthy throughout: GET /api/auth/me -> 401 (unauth) as expected, no 5xx from the API; the crash is purely client-side (also observed as a console pageerror on two other unrelated checks right after a mode switch/login transition, e.g. history-and-reviews-access-and-public-profile), confirming it's a general Radar-map teardown race, not an isolated fluke of one script."
+    }
+  ],
+  "action_items": [
+    "bug: fix Radar map (maplibre-gl-leaflet) unmount/remount race causing 'Cannot read properties of null (reading getZoom)' crash when switching UI mode (Pilote<->ATC) more than once in the same session -- see mode-switch-respects-permissions check.",
+    "pre-existing (not from this iteration): running the full backend pytest suite (tests/test_tscheck_admin_single.py and test_tscheck_admin_block.py intentionally generate many failed-login/register attempts to test brute-force protection) exhausts the process-wide IP rate limiter (routers/auth.py _throttle, 30 failed attempts / 15 min per IP) and cascades 429s into every other test file in the same run, even right after a backend restart. This is a test-suite design issue (shared IP across all tests in one pytest process), not a product defect in the 8 criteria covered by this iteration; left untouched as it is unrelated to this briefing. No new backend test files were added this iteration since every criterion is UI-facing and already carries inline API assertions in its browser check."
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "Fixed top bar: logo + title, UTC clock ticking, mode switch, Discord link, logout with inline confirm ending session",
+      "name": "topbar-clock-mode-discord-logout",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "top-bar/utc-clock visible; server-time text changed within 5s (ticking); header-discord-link href=https://discord.gg/xjhTqW3N7d; logout-button -> logout-confirm-button -> redirected to /login; GET /api/auth/me -> 401 after."
+    },
+    {
+      "criterion": "Collapsible left sidebar remembered across pages/reloads; nav differs by mode",
+      "name": "sidebar-collapse-persists-and-nav-by-mode",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Pilote nav-radar/nav-new-flight/nav-ranking/nav-profile visible; sidebar data-collapsed toggled false->true via sidebar-toggle, stayed true after navigating to /classement and after a full page reload."
+    },
+    {
+      "criterion": "Mode switch respects permissions (pilot blocked from ATC; ATC can switch without re-login)",
+      "name": "mode-switch-respects-permissions",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "Pilot part passed (mode-switch-atc with no atc_allowed stayed on /mode). ATC part crashed the app on the second switch back to ATC -- see bugs[0]."
+    },
+    {
+      "criterion": "Radar: no route until flight selected; selecting opens right panel; closing removes it",
+      "name": "radar-route-only-on-selection",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Selected flight-row-ACA317 -> selected-flight-panel + center-on-flight appeared; close-flight-panel removed selected-flight-panel (count 0)."
+    },
+    {
+      "criterion": "Controlled flight: ATC claim via claim-flight button persists; pilot sees controlled-notice; pilot API action -> 403",
+      "name": "atc-ui-claim-flight-button-works",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Single claimBtn click issued exactly 1 POST /flights/{id}/claim {release:false,version:8}; GET /api/flights/{id} afterwards returned controller_name='Test ATC', version 9. (An earlier combined script that failed here was a test-script race -- reran isolated and it passed cleanly; classified as flaky-in-my-own-script, not a product bug.)"
+    },
+    {
+      "criterion": "Controlled flight: pilot sees controlled-notice and has no actions once claimed; API 403",
+      "name": "pilot-sees-controlled-notice-when-claimed",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "selected-controller showed 'CYUL_GND'; flight-detail-panel showed controlled-notice; POST /api/flights/{id}/actions (point_attente) -> 403 'Vol contrôlé par Test ATC (CYUL_GND)...'. Claim released via API afterwards to restore shared fixture state."
+    },
+    {
+      "criterion": "Pushback requires direction N/S/E/W (422 without it); UI shows pushback-picker",
+      "name": "pushback-requires-direction",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "POST /api/flights/{id}/actions {action:'repoussage', version} without pushback_dir -> 422; action-repoussage click opened pushback-picker with pushback-N/S/E/W all visible; clicking pushback-S closed the picker and advanced phase to repoussage. Flight phase stepped back to pret_depart before the test (via ATC step API) and restored to roulage afterwards."
+    },
+    {
+      "criterion": "Strips: OACI filter shows Départs/Arrivées with empty message; Vue globale resets",
+      "name": "strips-icao-filter-sections-and-global-view",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filtering CYUL showed strip-section-departures (strip-aca317 present) and strip-section-arrivals-empty; filtering LFPG showed both strip-section-departures-empty and strip-section-arrivals-empty; strip-global-view cleared strip-icao-filter and hid strip-section-departures."
+    },
+    {
+      "criterion": "History (ATC/admin only) with filters; pilot 403 on /api/history and /api/admin/reviews; public profile has no email; review-panel renders",
+      "name": "history-and-reviews-access-and-public-profile",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "ATC: history-search/history-airport/history-status/history-table all visible on /history; nav-history absent for pilot and GET /api/history -> 403, GET /api/admin/reviews -> 403; /pilotes/{pilot_id} showed profile-name and page body text excluded '@skyradar-test.fr'; pilot's own /profile rendered review-panel."
+    }
+  ]
+}

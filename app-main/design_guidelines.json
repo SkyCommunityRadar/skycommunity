@@ -1,0 +1,201 @@
+{
+  "theme": "dark",
+  "project_name": "SkyCommunity Radar",
+  "app_type": "ATC Tool & Flight Radar Dashboard (Desktop-First, Francophone MSFS Community)",
+  "language": "fr",
+  "design_archetype": "ARCHETYPE 4: SWISS & TACTICAL ATC RADAR (High-Contrast, Pure Clarity, Flight Deck Aesthetics)",
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#0B111E",
+        "on_bg": "#E2E8F0",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#38BDF8",
+          "error": "#F87171",
+          "success": "#34D399",
+          "warning": "#FBBF24",
+          "atc_cyan": "#00F0FF",
+          "atc_amber": "#FFB800",
+          "atc_emerald": "#10B981"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#111827",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "border": "#1E293B",
+          "border_active": "#0284C7",
+          "header_bg": "#0F172A",
+          "badge_bg": "#1E293B",
+          "badge_text": "#38BDF8"
+        }
+      },
+      {
+        "name": "panel_secondary",
+        "kind": "solid",
+        "bg": "#1E293B",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#CBD5E1",
+        "roles": {
+          "border": "#334155",
+          "hover_bg": "#334155"
+        }
+      },
+      {
+        "name": "radar_overlay",
+        "kind": "solid",
+        "bg": "#030712",
+        "on_bg": "#38BDF8",
+        "on_bg_muted": "#0284C7",
+        "roles": {
+          "grid_line": "#0F172A",
+          "range_ring": "#1E293B",
+          "aircraft_tag_bg": "#0B111E",
+          "aircraft_tag_border": "#0284C7",
+          "aircraft_tag_text": "#E0F2FE"
+        }
+      },
+      {
+        "name": "inverse",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0B111E",
+        "on_bg_muted": "#475569"
+      },
+      {
+        "name": "glass_header",
+        "kind": "glass",
+        "contrast_against": "#0B111E",
+        "guarantee": "backdrop-blur-md bg-[#0B111E]/90 border-b border-[#1E293B]",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "active_indicator": "#00F0FF",
+          "badge_sim": "#F59E0B"
+        }
+      }
+    ],
+    "accent": "#00E5FF",
+    "on_accent": "#030712",
+    "secondary_accent": "#38BDF8",
+    "on_secondary_accent": "#030712",
+    "phase_colors": {
+      "preparation": "#94A3B8",
+      "repoussage": "#A855F7",
+      "roulage": "#38BDF8",
+      "point_attente": "#F59E0B",
+      "decollage": "#10B981",
+      "en_route": "#00E5FF",
+      "approche": "#EC4899",
+      "atterrissage": "#10B981",
+      "roulage_arrivee": "#38BDF8",
+      "parking": "#64748B",
+      "termine": "#22C55E",
+      "suspendu": "#EAB308",
+      "annule": "#EF4444"
+    }
+  },
+  "typography": {
+    "font_family_sans": "Geist, system-ui, -apple-system, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "font_family_heading": "Geist, system-ui, -apple-system, sans-serif",
+    "import_instruction": "@import \"@fontsource-variable/geist\"; @import \"@fontsource-variable/jetbrains-mono\"; in /app/frontend/src/index.css",
+    "scale_px": {
+      "display": 48,
+      "h1": 36,
+      "h2": 28,
+      "h3": 20,
+      "body": 15,
+      "caption": 13,
+      "mono_data": 12
+    },
+    "rules": [
+      "Use JetBrains Mono for all ATC callsigns, squawk codes, flight levels, speed, coordinates, airport ICAO codes, and METAR/TAF readouts.",
+      "Headings in Geist with font-semibold or font-bold, tracking-tight.",
+      "Uppercase micro-labels (0.75rem / 12px) with tracking-wider for technical telemetry fields."
+    ]
+  },
+  "entry_surfaces": {
+    "/": "dark tactical radar dashboard — top glass bar with sync/status and logo slot, left flights sidebar, center Leaflet radar map with Carto Dark tiles, right expandable flight details/telemetry drawer",
+    "/airports": "tactical airport charts & taxiway viewer — list of supported hubs (LFPG, LSGG with FICTIF badges), interactive runway/taxiway diagram and taxi route editor",
+    "/simbrief": "flight plan import workbench — OFP XML/JSON parser with preview, route waypoints breakdown and 1-click active flight submission",
+    "/history": "flight log archives — high-density data table with filters by pilot, callsign, phase, and date with replay/export options",
+    "/admin": "control tower administration — user role management (Pilote, ATC, Admin), active flights master override, and live audit log stream",
+    "/login": "tactical flight crew auth — callsign/email credentials modal with simulator community notices",
+    "/register": "flight crew registration — pilot onboarding with Discord handle & simulator ID verification"
+  },
+  "visual_enhancers": {
+    "radar_grid": "Subtle 10% opacity concentric range rings (10nm, 20nm, 40nm) and crosshair grid on the radar canvas.",
+    "simulated_warning_pill": "Prominent, persistent amber tag 'POSITIONS & DONNÉES SIMULÉES / ESTIMÉES' with pulsing subtle indicator.",
+    "leaflet_tiles": "CARTO Dark Matter (https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png) with custom dark canvas pane styling.",
+    "aircraft_icons": "SVG chevron/airplane symbols dynamically rotated by heading (track), color-coded by flight phase with leader lines to ATC flight data blocks (Callsign, FL, Ground Speed, Destination).",
+    "tactical_borders": "1px solid #1E293B with sharp 4px or 6px radius for that true Eurocat/TopSky ATC radar hardware appearance."
+  },
+  "layouts": {
+    "main_radar_layout": {
+      "type": "3-column desktop-first command center",
+      "header": "h-12 border-b border-border bg-background/95 flex items-center justify-between px-4 z-30",
+      "left_sidebar": "w-80 lg:w-96 flex-shrink-0 border-r border-border bg-card flex flex-col h-[calc(100vh-3rem)] overflow-hidden",
+      "center_radar": "flex-1 relative h-[calc(100vh-3rem)] bg-[#030712]",
+      "right_drawer": "w-88 lg:w-96 flex-shrink-0 border-l border-border bg-card flex flex-col h-[calc(100vh-3rem)] overflow-y-auto"
+    }
+  },
+  "component_structure": {
+    "header": {
+      "path": "@/components/Header.tsx",
+      "description": "Top bar containing SkyCommunity logo slot, frequency/server status indicator, simulator time (UTC / Zulu), active flights counter, quick phase filter, user role pill (Pilote/ATC/Admin), and quick actions (SimBrief Import, Taxi Editor)."
+    },
+    "radar_map": {
+      "path": "@/components/RadarMap.tsx",
+      "description": "Leaflet map with CARTO Dark Matter tiles. Renders active flights with rotation, flight trails, FIR boundaries, airport runways/taxiways (LFPG, LSGG), waypoints, and interactive click-to-select."
+    },
+    "flight_list": {
+      "path": "@/components/FlightList.tsx",
+      "description": "Dense tabular/card list of active flights with phase badges, search by callsign/pilot, filter by phase, squawk code, and origin/destination."
+    },
+    "flight_details_drawer": {
+      "path": "@/components/FlightDetailsDrawer.tsx",
+      "description": "ATC strip & Flight Plan detail view with phase action selector (Préparation -> Repoussage -> Roulage -> Point d'attente -> Décollage -> En Route -> Approche -> Atterrissage -> Roulage Arrivée -> Parking -> Terminé), altitude/speed graph, SimBrief OFP details, route waypoints, and history timeline."
+    },
+    "taxi_route_editor": {
+      "path": "@/components/TaxiRouteEditor.tsx",
+      "description": "Interactive airport taxi route planner on top of airport diagram (LFPG/LSGG), letting ATC or Pilots click taxiway nodes/segments (A, B, T1, Hold Short 26L) and transmit progressive taxi clearances."
+    },
+    "simbrief_importer": {
+      "path": "@/components/SimBriefImporter.tsx",
+      "description": "SimBrief username/OFP fetch tool with route preview, fuel/payload calculation, cruising altitude, alternate airport, and 1-click radar flight creation."
+    },
+    "airport_hub_view": {
+      "path": "@/components/AirportHubView.tsx",
+      "description": "Airport information dashboard for LFPG and LSGG with runway configurations, current simulated ATIS/METAR, parked/departing aircraft lists, and prominent 'DONNÉES FICTIVES' labels."
+    }
+  },
+  "motion": {
+    "transitions": "Specific CSS transitions: transition-[background-color,border-color,opacity,transform] duration-150 ease-out",
+    "radar_sweep": "Subtle radar sweep line animation (toggleable)",
+    "pulsing_alerts": "animate-pulse on squawk 7700/7600 emergencies or holding point alerts",
+    "drawer_slide": "Smooth slide-in transition for flight details and tools"
+  },
+  "accessibility": {
+    "contrast_compliance": "All telemetry, labels and table headers verified > 4.5:1 against #0B111E and #111827.",
+    "colorblind_safety": "Flight phases use distinct badges with text labels and icon shapes in addition to color coding.",
+    "keyboard_shortcuts": "ESC closes drawers, space recenters map on selected aircraft, numbers 1-9 switch radar filters.",
+    "data_testids": "All interactive buttons, flight list items, phase triggers, and inputs must have data-testid attributes."
+  },
+  "instructions_to_main_agent": [
+    "1. Install Leaflet and types: cd /app/frontend && yarn add leaflet @types/leaflet leaflet-rotatedmarker",
+    "2. Configure dark theme in /app/frontend/src/index.css with Geist and JetBrains Mono variable fonts. Set dark class on html tag.",
+    "3. Seed realistic MSFS French flights (e.g. AFR452, EZS188, TVF22A, HOP14DF) with realistic routes between LFPG, LSGG, LFMN, LFBO, LFLL with simulated altitudes and phases.",
+    "4. Ensure every simulated position and airport diagram is explicitly stamped with 'SIMULÉ / ESTIMÉ' and 'DONNÉES FICTIVES' in compliance with flight community safety rules.",
+    "5. Provide intuitive ATC phase action buttons in the FlightDetailsDrawer allowing pilots/ATC to step through the 13 defined flight phases.",
+    "6. Include complete role support: 'Pilote' (can update own flight), 'ATC' (can update any flight & issue taxi routes), 'Admin' (can manage users, reset radar, purge flights, inspect audit log). Provide a quick role switcher for testing.",
+    "7. Build SimBrief XML/JSON import modal with instant preview and pre-fill capabilities.",
+    "8. Build Taxi Route Editor on airport diagram allowing clickable taxiway waypoints and visual path highlights."
+  ]
+}

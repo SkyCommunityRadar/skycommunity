@@ -1,0 +1,43 @@
+{
+  "iteration": 4,
+  "summary": "New briefing: Bearer-token session fallback (x-session-token / Authorization: Bearer / localStorage 'skyradar_token') for browsers that refuse the httpOnly cookie. 4/4 acceptance criteria covered: 1 new backend test file (2 tests) + 3 new browser checks, plus repaired one pre-existing browser check (session-expiry-no-redirect-loop) whose cookie-only-clear assumption was invalidated by the new intentional fallback (not an app bug — updated to also clear the fallback token, matching the briefed design), re-ran the full backend suite (28 tests) for regression. Everything passed. Test fixtures (tscheck-* users/flights) cleaned up at the end.",
+  "passed": 4,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "User keeps being logged out and sent to /login (browser blocks the session cookie) -> Bearer/localStorage fallback keeps the app logged in across navigation, reload, and a 15s radar-poll wait",
+      "name": "cookie-blocked-bearer-session-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Intercepted every /api/** request on the https preview URL with a plain Node fetch (bypassing Playwright's context-shared APIRequestContext, which otherwise silently re-applies Set-Cookie even when omitted from the fulfilled response) and stripped 'set-cookie' from every response; registered tscheck-nocookie-* pilot -> landed on radar with NO 'skyradar_session' cookie in context.cookies() but 'skyradar_token' present in localStorage; navigated nav-new-flight -> nav-airports -> nav-history -> nav-profile -> nav-radar without ever matching /login; full page reload stayed logged in; waited 16s (one radar poll cycle) and still not redirected to /login."
+    },
+    {
+      "criterion": "Normal cookie path still works (login, reload keeps session, logout returns to /login, following reload stays on /login with token cleared)",
+      "name": "normal-cookie-login-logout-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "No interception; registered tscheck-normalcookie-* pilot -> reload kept session (current-user visible); clicked logout-button -> redirected to /login, 'skyradar_token' confirmed absent from localStorage afterwards; a following reload stayed on /login with tab-login visible."
+    },
+    {
+      "criterion": "Stale/invalid credentials handled (API: cookie-first-then-bearer precedence, invalid bearer -> 401) and role checks unchanged with Bearer auth",
+      "name": "test_tscheck_bearer_fallback.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /auth/me with an invalid 'skyradar_session' cookie but a valid Bearer -> 200, correct email returned (bearer fallback not masked by a bad cookie); GET /auth/me with only an invalid Bearer -> 401. POST /flights/demo as atc via Bearer -> 403; GET /admin/users as pilote via Bearer -> 403. 2 tests passed."
+    },
+    {
+      "criterion": "Stale/invalid credentials handled (UI: garbage localStorage token + no cookie lands once on /login, no redirect loop, no replaceState error)",
+      "name": "garbage-token-no-redirect-loop",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Cleared cookies, set localStorage 'skyradar_token' to a garbage value, navigated to /history -> landed on /login exactly once; URL stable over a 5s wait (no bounce loop); zero replaceState console/page errors; garbage token confirmed cleared from localStorage after the resulting 401."
+    }
+  ],
+  "note_non_criterion_fix": "Pre-existing browser check 'session-expiry-no-redirect-loop' (from a prior iteration, predating the Bearer fallback) asserted that clearing only the session cookie logs the user out; with the new intentional Bearer fallback this is no longer true by design (briefed trade-off), so it was updated to also clear the localStorage token before asserting the /login redirect. Re-ran green; not counted as an app bug since the new behavior matches the briefing's spec_deviations."
+}

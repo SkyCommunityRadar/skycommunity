@@ -1,0 +1,113 @@
+{
+  "iteration": 5,
+  "summary": "New briefing (single admin account, mode chooser gating pilote/ATC, demos removed, real OSM gate selection, ATC taxi-entry on real taxiways with aircraft following it at 15kt, security hardening, Aeroports stands/zoom). 8/8 acceptance criteria covered: 7 new backend test files (14 tests) + 6 new browser checks. Everything passed. Found and fixed test-infra-only issues (not app bugs): a cross-module race on the shared real SimBrief ACA317 fixture under pytest-xdist, fixed with a filesystem lock; and transient 429s from the per-IP registration throttle caused by my own repeated test reruns, resolved by restarting the backend to clear its in-memory window before the final run (the throttle itself is correct per spec). Ran one browser check against the public preview URL. Test fixtures (tscheck-* users disabled, tscheck flights deleted) cleaned up; seeded admin, THA28 flight untouched.",
+  "passed": 13,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Single admin account",
+      "name": "test_tscheck_admin_single.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /auth/login admin -> 200 role=admin; POST /auth/register with admin email -> 409; POST /auth/mode {mode:'admin'} as a regular user -> 422 (not a valid literal); GET /admin/users as pilote -> 403. 3 tests passed."
+    },
+    {
+      "criterion": "Single admin account",
+      "name": "admin-login-lands-on-radar",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Logged in as skycommunity50@gmail.com -> landed directly on '/' (radar), 'nav-admin' visible, current-user-role shows 'admin', no 'switch-mode-link'. Also re-ran against the public preview URL https://radar-skycom.preview.emergentagent.com with the same result."
+    },
+    {
+      "criterion": "Mode chooser after login for non-admins",
+      "name": "test_tscheck_mode_chooser.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Fresh registered user: GET /flights -> 403 before mode; POST /auth/mode {mode:'atc'} -> 403 (atc_allowed false); POST /auth/mode {mode:'pilote'} -> 200, then GET /flights -> 200. Second test: admin PATCH /admin/users/{id} {atc_allowed:true} -> mode=atc succeeds (200); admin PATCH {atc_allowed:false} -> the SAME already-open cookie session then gets GET /flights -> 401 (token_version bump revokes immediately). 2 tests passed."
+    },
+    {
+      "criterion": "Mode chooser after login for non-admins",
+      "name": "mode-chooser-locks-atc",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Registered tscheck-mode-* -> landed on /mode; GET /api/flights -> 403 (checked via page.request before choosing); 'mode-atc-locked' message visible and ATC button disabled; chose Pilote -> landed on '/' with role=pilote and GET /api/flights -> 200; 'Changer de mode' returned to /mode."
+    },
+    {
+      "criterion": "Demonstrations removed",
+      "name": "test_tscheck_demo_removed.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /flights/demo as admin -> 404 (route no longer exists). 1 test passed."
+    },
+    {
+      "criterion": "Demonstrations removed",
+      "name": "new-flight-no-demo-tab",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Nouveau vol page shows exactly 1 tab ('Import SimBrief'); full-page text contains no 'fictif', 'position estimée', '(réel)' or 'démo'; POST /api/flights/demo -> 404 via page.request."
+    },
+    {
+      "criterion": "Gate selection at flight creation",
+      "name": "test_tscheck_gate_selection.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "SimBrief pilot_id=1 -> CYUL->CYYC; confirm with dep_gate='11' -> 200, dep_gate.ref=='11', position.lat/lon match the real OSM stand 11 coords (diff<1e-4); confirm with dep_gate='ZZZ999' -> 400 with French 'poste de stationnement ... inconnu'. 2 tests passed."
+    },
+    {
+      "criterion": "Gate selection at flight creation",
+      "name": "gate-selection-creates-flight-at-stand",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Import SimBrief Pilot ID 1 -> preview CYUL -> CYYC; gate input shows '142 postes disponibles à CYUL' (real OSM stands); entered '11', confirmed -> flight ACA317 detail page; API cross-check: dep_gate.ref='11', position within 1e-4 deg of the real stand coordinates."
+    },
+    {
+      "criterion": "ATC taxi entry follows real taxiways",
+      "name": "test_tscheck_atc_taxi.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /airports/CYUL/taxi-preview with start_gate=11 and 2 clicked points -> 200, path has >2 points and >=1 taxiway name, length_nm>0; PUT /flights/{id}/taxi as admin (flight:taxi) -> 200 saved with names; PUT /flights/{id}/taxi as a plain pilote -> 403. 2 tests passed."
+    },
+    {
+      "criterion": "ATC taxi entry follows real taxiways",
+      "name": "atc-taxi-preview-and-save",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened a fixture flight's Roulage tab, clicked 'Saisir le roulage', clicked 2 points on the map near the gate; preview resolved to real taxiway names (no 'Calcul…'/error) and 'Enregistrer le roulage' persisted it (taxi-taxi_out-path visible); API cross-check GET /flights/{id} shows taxi_out.names non-empty."
+    },
+    {
+      "criterion": "Aircraft follows the ATC taxi when taxi starts",
+      "name": "test_tscheck_taxi_progression.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "After PUT taxi + POST actions pret_depart then roulage: position.track='taxi_out'; after 8s real time, GET /flights/{id} shows distance_nm strictly increased (~15kt) and prev_wp is a taxiway name. 1 test passed."
+    },
+    {
+      "criterion": "Aircraft follows the ATC taxi when taxi starts",
+      "name": "aircraft-follows-saved-taxi-route",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Fixture flight with a saved taxi route; clicked 'Prêt au départ' then 'Début du roulage'; the flight-strip progress readout changed within 15s (retried every 1s) confirming visible on-map/strip advancement; API cross-check: position.track='taxi_out', distance_nm>0."
+    },
+    {
+      "criterion": "Security hardening",
+      "name": "test_tscheck_security.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /auth/login with Origin: https://evil.example -> 403, no access-control-allow-credentials header; GET /health -> x-content-type-options: nosniff; 9 consecutive wrong-password POST /auth/login for a fresh email -> last attempt returns 429. 3 tests passed."
+    },
+    {
+      "criterion": "Aéroports page",
+      "name": "aeroports-stands-search-and-zoom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Searched CYUL -> airport-detail with 142 gate chips (real OSM stands, count>50 asserted); clicked stand chip '11' -> map tile layer requests zoom level 18 (/18/ in tile src), confirming the zoom-in."
+    }
+  ],
+  "note_scope": "8/8 matrix criteria covered with 13 artifacts (7 backend files, 6 browser checks); every API-bearing UI criterion got both lanes as required."
+}

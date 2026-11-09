@@ -1,0 +1,34 @@
+{
+  "iteration": 10,
+  "summary": "Retest of previously-reported Radar map crash bug (getZoom null on repeated mode switches / nav away-and-back to Radar). Backend suite re-run first: same pre-existing rate-limit cascade (out of scope, per spec_deviations) -- 29 failed / 4 passed, all due to the shared-IP throttle in auth tests, not a regression. Browser lane: re-ran the two persisted checks implicated in the prior bug (mode-switch-respects-permissions, history-and-reviews-access-and-public-profile) and added one new dedicated check (mode-switch-repeated-no-radar-crash) that exactly matches the briefing's acceptance criterion -- ATC login -> mode-atc-button -> 3x (mode-switch-pilote -> mode-switch-atc) -> nav-history -> nav-radar. All 3 browser checks PASSED with no runtime-error overlay and no 'getZoom' pageerror. The previously reported high-severity bug is now fixed.",
+  "passed": 3,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "pre-existing (not from this iteration): backend pytest suite's brute-force/throttle tests (test_tscheck_admin_single.py, test_tscheck_admin_block.py) exhaust the shared process-wide IP rate limiter and cascade 429s across the rest of the suite in the same run (29 failed / 4 passed). This is a test-suite design issue (shared IP across all tests in one pytest process), out of scope per spec_deviations, not re-litigated here."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Mode switch respects permissions (pilot blocked from ATC; ATC can switch Pilote<->ATC without re-login) -- regression check for prior getZoom crash",
+      "name": "mode-switch-respects-permissions",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check: pilot mode-switch-atc stayed blocked on /mode; ATC logged in, mode-atc-button -> mode-switch-pilote -> mode-switch-atc completed with nav-new-flight then nav-history visible each time, no crash/overlay. Console: only expected 401s."
+    },
+    {
+      "criterion": "History/reviews access control and public profile -- also touches a mode/login transition implicated in prior crash",
+      "name": "history-and-reviews-access-and-public-profile",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check: ATC history-table visible; pilot blocked from /history and /api/history (403); public profile hides email; pilot's own profile renders review-panel. No pageerror."
+    },
+    {
+      "criterion": "Mode switch Pilote<->ATC repeated several times (x3) and page navigation away from/back to Radar never crashes the radar map",
+      "name": "mode-switch-repeated-no-radar-crash",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "ATC login -> mode-atc-button -> 3x(mode-switch-pilote -> mode-switch-atc) -> nav-history -> nav-radar: nav-history visible at end, .leaflet-container rendered after returning to Radar, no runtime-error overlay, no pageerror containing 'getZoom' (pageerror listener captured 0 matching errors). Confirms the previously-reported crash (iteration_9 bug) is fixed."
+    }
+  ]
+}

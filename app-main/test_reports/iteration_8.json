@@ -1,0 +1,57 @@
+{
+  "iteration": 8,
+  "summary": "New briefing (freeze-on-confirm bug fix, shared ATC strips, panel collapse/full-map, aerodrome chart map style, THA28 deletion). 6 criteria -> 5 browser checks + 2 backend test files (one UI-facing criterion got both). All passed: 5 passed, 0 failed, 0 flaky, 0 blocked, 0 test_error. One sub-case (strip duplicate-squawk 409 across two simultaneously active flights) could not be reproduced live end-to-end: this environment has exactly one working real SimBrief Pilot ID (1) and the app only creates flights via SimBrief import with unique-callsign enforcement, so two distinct active flights can never coexist here; verified by source inspection instead (routers/strips.py) plus a live self-exclusion sanity check -- recorded as a note, not a bug.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "note: strips duplicate-squawk 409 (two simultaneously active flights with the same squawk) can only be exercised live with a second real SimBrief account producing a different callsign; this env has only Pilot ID 1 (always ACA317) and /simbrief/confirm enforces unique callsign among ACTIVE flights, so a true cross-flight fixture can't be built over HTTP here. Verified by source review of routers/strips.py (409 raised when another ACTIVE flight shares the squawk, excluding the flight's own id) and a passing self-exclusion sanity assertion in tests/test_tscheck_strips.py. Not a defect; no code change needed.",
+    "pre-existing (not from this iteration): tests/test_tscheck_mode_chooser.py::test_logging_out_invalidates_session_immediately fails on a fresh run (already flagged in iteration_7's action_items) -- unrelated to this briefing's criteria, left untouched.",
+    "running the full backend suite deletes the seeded ACA317 fixture flight down to zero rows (every tscheck file borrows/returns the ACA317 callsign slot and none restores a 'default' active flight at the very end of a full run) -- recreated ACA317 (gate 1, squawk 4522, pret_depart, strip fields) via the API after the suite so the UI/browser checks and any follow-on manual testing have it available again; main agent may want a dedicated seed script for this instead of relying on test cleanup."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Clicking any flight action button on the radar selected-flight panel never freezes or blurs the page",
+      "name": "radar-inline-confirm-no-freeze",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Selected ACA317 on radar, clicked step-next (confirm-required): data-testid=confirm-dialog rendered inline inside the panel (no [class*=fixed][class*=inset-0] visible overlay found), confirm-ok closed it, body pointer-events stayed 'auto', center-on-flight and nav-radar remained clickable afterward. Screenshots: confirm-dialog-open.png, after-confirm-page-usable.png. Flight phase restored via API force call at end of script."
+    },
+    {
+      "criterion": "Shared ATC strips visible to all ATC",
+      "name": "radar-strips-shared-edit-persist",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "radar-tab-strips -> strip-aca317 visible; edited squawk/initial-alt/cruise-fl/approach-alt/remarks via strip-edit-aca317, saved, UI reflected new values, survived a full page reload, and GET /api/strips returned squawk '5566' for ACA317. Original values (4522/5000/340/3000/'RWY 24L') restored at the end of the script."
+    },
+    {
+      "criterion": "Strip validation and access control",
+      "name": "test_tscheck_strips.py::test_strip_update_validation_and_access_control",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PUT /api/strips/{id} squawk='8888' -> 422; anonymous GET /api/strips (no cookies) -> 401; a fresh pilote-mode user GET /api/strips -> 403; self-exclusion sanity (re-saving own squawk) -> 200 twice. Duplicate-squawk 409 across two distinct active flights verified by source review only (see action_items) -- single real SimBrief account in this env prevents a live two-flight fixture; noted, not a failure."
+    },
+    {
+      "criterion": "Collapsible side columns / full map",
+      "name": "radar-collapsible-panels-and-full-map",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "toggle-left-panel hid/showed radar-left-panel; toggle-right-panel hid/showed radar-right-panel (after selecting ACA317); toggle-full-map hid both and .leaflet-container width was >=90% of the 1280px viewport; toggling full-map again restored both panels. Screenshots: left-hidden, right-hidden, full-map, restored."
+    },
+    {
+      "criterion": "Airport map style like aerodrome chart",
+      "name": "airport-map-aerodrome-chart-style",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Zoomed on CYUL via leaflet zoom-in controls: .leaflet-container background rgb<80,80,110-ish> dark navy; .twy-label span color rgb(232,194,90) gold; .stand-label color rgb(229,231,235) near-white with transparent background (verified via getComputedStyle). Screenshot shows gold taxiway centerlines/labels on dark navy background."
+    },
+    {
+      "criterion": "THA28 flight deleted",
+      "name": "test_tscheck_tha28_deleted.py::test_no_tha28_flight_in_any_scope",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/flights?scope=all -> 200, callsigns=['ACA317']; THA28 absent."
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "iteration": 1,
+  "summary": "All 8 acceptance criteria exercised: 13 backend tests (5 new tscheck files + pre-existing test_engine_unit.py) and 6 named browser checks. Everything passed.",
+  "passed": 11,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Full demo flight lifecycle LFPG\u2192LSGG by a pilot",
+      "name": "demo-flight-lifecycle",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Pilot created demo flight (sim factor 120), clicked all phase actions pr\u00eat\u2192repoussage\u2192roulage\u2192point d'attente\u2192d\u00e9collage\u2192(auto en route)\u2192approche\u2192atterrissage\u2192roulage arriv\u00e9e\u2192parking\u2192terminer; FICTIF badge visible; Historique tab showed 8+ event-item rows including actor 'Pilote'."
+    },
+    {
+      "criterion": "Server-side progression, shared between pilot and ATC",
+      "name": "shared-progression-pilot-atc",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Second browser context logged in as ATC opened the same flight and detail-phase data-phase matched the pilot's (en_route); after an 8s unattended wait + reload, detail-next-wp/detail-alt values changed, proving server-side ticker progression without the pilot's tab open."
+    },
+    {
+      "criterion": "Server-side role enforcement",
+      "name": "test_tscheck_role_enforcement.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /flights/demo as atc -> 403; POST /flights/{id}/control as pilote -> 403; second pilote account acting on another pilot's flight -> 403; anonymous GET /flights -> 401; GET /admin/users as pilote/atc -> 403, as admin -> 200. 5 tests passed."
+    },
+    {
+      "criterion": "Invalid state transitions and stale versions rejected",
+      "name": "test_tscheck_invalid_transitions.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /flights/{id}/actions action=decollage from phase=preparation -> 409 detail 'Transition refus\u00e9e : \u00ab D\u00e9collage \u00bb impossible depuis l'\u00e9tat \u00ab Pr\u00e9paration \u00bb.'; reusing a stale version after a successful transition -> 409. 2 tests passed."
+    },
+    {
+      "criterion": "ATC controls",
+      "name": "atc-controls-tab",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On the Contr\u00f4le tab, ATC clicked pause (hold indicator flips to 'Reprendre'), resume, selected a waypoint and applied it, picked free-position mode and clicked the map (position-kind became 'POSITION MANUELLE (ATC)'); Historique tab text included both 'pause' and 'position' entries."
+    },
+    {
+      "criterion": "ATC controls (API)",
+      "name": "test_tscheck_atc_controls.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /flights/{id}/control op=pause -> hold=true, op=resume -> hold=false, op=set_waypoint, op=set_position(free) -> position.lat/lon match sent coords; events included pause/position entries; pilot calling /control -> 403. 2 tests passed."
+    },
+    {
+      "criterion": "Taxi route editing",
+      "name": "taxi-route-editing",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Pilot clicked connected LFPG nodes STAND DEMO 1\u2192TWY A1\u2192TWY A2 on the map, saved -> status PROPOS\u00c9; a disconnected LSGG pair (STAND DEMO 11, STAND DEMO 12) showed 'non reli\u00e9' and disabled Save; second browser context as ATC validated the proposed route -> status VALID\u00c9."
+    },
+    {
+      "criterion": "Taxi route editing (API)",
+      "name": "test_tscheck_taxi_route.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PUT /flights/{id}/taxi with connected node_ids [S1,A1,A2] -> 200, status propose; POST /taxi/validate -> status valide; disconnected [S1,H2] -> 400 'ne sont pas reli\u00e9s par un segment'. 1 test passed."
+    },
+    {
+      "criterion": "SimBrief import errors",
+      "name": "simbrief-import-error",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Nouveau vol > Import SimBrief, Pilot ID '0' -> French error 'Identifiant SimBrief inconnu. V\u00e9rifiez votre Pilot ID ou nom d'utilisateur.' shown; no preview/flight created."
+    },
+    {
+      "criterion": "Persistence and admin",
+      "name": "persistence-and-admin",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Pilot flight phase persisted across a page reload; admin changed a freshly-registered fixture user's role to atc via /admin; admin forced a flight's phase to 'roulage' with a reason, visible both on the flight (detail-phase data-phase=roulage) and in the global Journal tab containing the reason text."
+    },
+    {
+      "criterion": "Persistence and admin (API)",
+      "name": "test_tscheck_admin_persistence.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PATCH /admin/users/{id} role=atc -> 200 and reflected in GET /admin/users; POST /flights/{id}/force with reason -> 200, phase persists on re-GET, reason appears in both /flights/{id}/events and /admin/events; non-admin force -> 403. 3 tests passed."
+    }
+  ]
+}

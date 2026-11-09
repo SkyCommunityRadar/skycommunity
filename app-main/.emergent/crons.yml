@@ -1,0 +1,8 @@
+crons:
+  - name: daily-db-backup
+    description: "Sauvegarde quotidienne compressée de la base SkyCommunity Radar (03:15 UTC, 14 conservées)"
+    cron: "15 3 * * *"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/backup"
+    method: POST
+    enabled: true

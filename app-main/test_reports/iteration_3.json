@@ -1,0 +1,70 @@
+{
+  "iteration": 3,
+  "summary": "New briefing (HTTPS session cookie fix, SimBrief Pilot-ID-only import, airport lookup 'Aller', Discord button, logo colour rebrand, demo-lifecycle regression): 6/6 acceptance criteria covered with 3 new backend test files (8 tests) + 4 new browser checks, plus a re-run of the pre-existing full backend suite (26 tests) and the pre-existing demo-flight-lifecycle browser check for regression. Everything passed.",
+  "passed": 8,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Session no longer drops over HTTPS (cookie attrs + full nav without redirect to /login; logout still returns to /login)",
+      "name": "https-session-full-navigation",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Over the https preview URL, registered tscheck-httpsnav-* pilot; cookie 'skyradar_session' confirmed httpOnly=true, sameSite='None', secure=true via page.context().cookies(); navigated Radar -> Nouveau vol (incl. a SimBrief Pilot ID 1 fetch) -> Aéroports -> Historique -> Profil -> Radar, URL never matched /login at any step; clicking logout-button navigated to /login showing tab-login."
+    },
+    {
+      "criterion": "Session cookie attributes (API)",
+      "name": "test_tscheck_session_cookie.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /auth/login over plain HTTP backend -> Set-Cookie 'skyradar_session=...; HttpOnly; SameSite=Lax' (no Secure/Partitioned on http, matching lib/auth.py COOKIE logic); GET /auth/me -> 200 with matching email; POST /auth/logout then GET /auth/me -> 401. 2 tests passed."
+    },
+    {
+      "criterion": "SimBrief import by Pilot ID only (UI)",
+      "name": "simbrief-pilot-id-import",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Nouveau vol > Import SimBrief shows only 'Pilot ID SimBrief' numeric input (typed 'abc1xyz' -> value became '1', letters stripped); Pilot ID '1' showed preview-callsign/preview-route-airports, 'Confirmer et créer le vol' navigated to /flights/{id} with detail-callsign visible and the flight appeared on the radar flight list; Pilot ID '100' showed simbrief-error matching /aucun plan de vol/i and no simbrief-preview rendered."
+    },
+    {
+      "criterion": "SimBrief import by Pilot ID only (API)",
+      "name": "test_tscheck_simbrief_pilot_id.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /simbrief/fetch {pilot_id:'1'} -> 200 with departure/arrival/waypoints and draft_id; POST /simbrief/confirm/{draft_id} -> 200 flight.source=='simbrief' with route>=2 points, visible in GET /flights; POST /simbrief/fetch {pilot_id:'100'} -> 404 detail containing 'aucun'/'plan de vol', flight list unchanged (before/after id sets equal). 2 tests passed."
+    },
+    {
+      "criterion": "Airport search 'Aller' on the radar (UI)",
+      "name": "airport-search-aller",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Typed lowercase 'lfpg' + clicked Aller -> result box contains 'LFPG'; typed 'kjfk' + pressed Enter -> result box updated to contain 'KJFK' (unconfigured reference-only airport); typed 'zzzz' + Aller -> result box shows French error text matching /introuvable|inconnu|aucun/i."
+    },
+    {
+      "criterion": "Airport search lookup (API)",
+      "name": "test_tscheck_airport_lookup.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /airports/lookup/LFPG -> 200 configured=true; GET /airports/lookup/lfmn (lowercase) -> 200 icao='LFMN' configured=false; GET /airports/lookup/ZZZZ -> 404; anonymous GET /airports/lookup/LFPG -> 401. 4 tests passed."
+    },
+    {
+      "criterion": "Discord button (login + header) and logo colours applied",
+      "name": "discord-button-and-logo-colors",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Login page discord-button visible, text 'Rejoindre le Discord SkyCommunity', href='https://discord.gg/xjhTqW3N7d', target='_blank'; after registering tscheck-discord-* pilot, header-discord-link has the same href; brand-link 'Radar' span computed color == rgb(74,168,240) (#4AA8F0); simbrief-fetch-button computed background-color == rgb(74,168,240). grep across frontend/src found zero remaining #00E5FF references."
+    },
+    {
+      "criterion": "No regression on demo lifecycle (pilot flow + ATC 403)",
+      "name": "demo-flight-lifecycle + test_tscheck_role_enforcement.py",
+      "lane": "browser+backend",
+      "status": "passed",
+      "evidence": "Re-ran persisted browser check demo-flight-lifecycle: pilot created demo flight and clicked all phase actions through to terminé, FICTIF badge and Historique entries visible. Full backend suite re-run (26 tests incl. test_tscheck_role_enforcement.py 'POST /flights/demo as atc -> 403') passed."
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "iteration": 2,
+  "summary": "Bug-fix retest for session-invalidation redirect loop. 2 new browser checks added for the 3 matrix criteria (one check covers the expiry+relogin pair) plus full pre-existing backend suite re-run. Everything passed.",
+  "passed": 4,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Reported bug: history.replaceState() redirect-loop when the session becomes invalid while the app is open",
+      "name": "session-expiry-no-redirect-loop",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Registered fresh pilot tscheck-expiry-*, landed on radar; cleared the session cookie mid-session and navigated to /history -> app landed on /login exactly once (URL stable for 6s), no console error matching /replaceState/i, only expected 401 network-log lines; login form (tab-login, login-email-input) visible."
+    },
+    {
+      "criterion": "Login after expiry returns to the previous page",
+      "name": "session-expiry-no-redirect-loop",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same run: after re-entering credentials on /login, submit navigated to / (or /history) and current-user became visible again — no loop, confirmed via screenshot session-expiry-no-redirect-loop-logged-back-in.png."
+    },
+    {
+      "criterion": "Normal flows not regressed",
+      "name": "normal-flows-not-regressed",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Logged-out visit to / redirected once to /login; registered tscheck-regress-* pilot -> radar shown; created fixture demo flight via API, selected its flight-row-<callsign> in the list -> URL gained ?f=<id> (screenshot flight-selected.png); closed the detail panel (panel-closed.png); logout returned to /login. Only console messages were the expected 401s."
+    },
+    {
+      "criterion": "Pre-existing backend suite (role enforcement, invalid transitions, ATC controls, taxi route, admin persistence, engine unit) unaffected by the fix",
+      "name": "pytest full suite",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q -p no:cacheprovider -> '17 passed in 1.89s' (test_engine_unit.py + 5 tscheck_*.py files)."
+    }
+  ]
+}
