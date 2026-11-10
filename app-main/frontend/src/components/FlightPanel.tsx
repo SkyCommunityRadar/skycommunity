@@ -13,7 +13,6 @@ import NavPanel from "@/components/NavPanel";
 import RouteTab from "@/components/RouteTab";
 import TaxiTab from "@/components/TaxiTab";
 import ReportPilot from "@/components/ReportPilot";
-import EndFlightReviews from "@/components/EndFlightReviews";
 import { Button } from "@/components/ui/button";
 import type { FlightDetail } from "@/lib/types";
 import type { FlightEditing } from "@/lib/useFlightEditing";
@@ -141,7 +140,6 @@ export default function FlightPanel({
               <FlightActions flight={f} ed={ed} part="main" />
             </Card>
             <ReportPilot flight={f} />
-            <EndFlightReviews phase={f.phase} />
             {((f.allowed_actions.length > 0 || f.can_control) && !!f.position.track && f.position.total_nm > 0 || f.can_control) && (
               <Card icon={Crosshair} title={tr("Position de l'avion")} testId="card-position">
                 {(f.allowed_actions.length > 0 || f.can_control) && <PositionNudge flight={f} />}

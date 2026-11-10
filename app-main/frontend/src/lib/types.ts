@@ -504,6 +504,8 @@ export interface Interaction {
   target_name: string;
   target_role: "pilote" | "atc";
   at: string;
+  snoozed?: boolean;
+  deadline?: string | null;
 }
 
 export interface PublicProfile {

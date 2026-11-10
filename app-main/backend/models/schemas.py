@@ -623,6 +623,8 @@ class Interaction(BaseModel):
     target_name: str
     target_role: Literal["pilote", "atc"]
     at: datetime
+    snoozed: bool = False  # reminder paused (« plus tard »): the opinion can still be given
+    deadline: datetime | None = None  # last moment to give it
 
 
 class ReviewDecisionIn(BaseModel):

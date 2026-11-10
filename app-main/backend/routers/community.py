@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 
 from lib.auth import require
@@ -18,7 +19,7 @@ from models.schemas import (HistoryEntry, Interaction, PublicProfile, PublicRevi
 from routers.common import avatar_url
 
 router = APIRouter(tags=["community"])
-INTERACTION_DAYS = 30
+REVIEW_WINDOW = timedelta(hours=24)  # after the end of the flight, while it is still fresh in mind
 CLOSED = ["termine", "annule"]
 
 
@@ -32,38 +33,44 @@ async def _controllers_of(flight_id: str) -> dict[str, str]:
 
 
 async def _interactions(user: dict) -> list[Interaction]:
-    since = utcnow() - timedelta(days=INTERACTION_DAYS)
+    """Opinions still to give: one per pilot <-> controller pair of a flight that has ENDED (« Terminer le vol »),
+    during the 24 h that follow. Opinions given or declined (« Ne pas laisser d'avis ») are gone for good."""
+    since = utcnow() - REVIEW_WINDOW
     out: list[Interaction] = []
-    # as a pilot: every controller who acted on my flights
-    async for f in db.flights.find({"pilot_id": user["id"], "updated_at": {"$gte": since}}, {"_id": 0}):
+    # as a pilot: every controller who acted on my finished flights
+    async for f in db.flights.find({"pilot_id": user["id"], "phase": "termine", "updated_at": {"$gte": since}}, {"_id": 0}):
         for cid, cname in (await _controllers_of(f["id"])).items():
             if cid != user["id"]:
                 out.append(Interaction(flight_id=f["id"], callsign=f["callsign"], departure=f["departure"],
                                        arrival=f["arrival"], target_id=cid, target_name=cname, target_role="atc",
                                        at=aware(f["updated_at"])))
-    # as a controller: pilots of flights I acted on
-    ids = await db.events.distinct("flight_id", {"actor_id": user["id"], "actor_role": "atc", "at": {"$gte": since}})
-    async for f in db.flights.find({"id": {"$in": [i for i in ids if i]}}, {"_id": 0}):
+    # as a controller: pilots of the finished flights I acted on
+    ids = await db.events.distinct("flight_id", {"actor_id": user["id"], "actor_role": "atc",
+                                                 "at": {"$gte": since - timedelta(days=2)}})  # long flights included
+    async for f in db.flights.find({"id": {"$in": [i for i in ids if i]}, "phase": "termine", "updated_at": {"$gte": since}},
+                                   {"_id": 0}):
         if f["pilot_id"] != user["id"]:
             out.append(Interaction(flight_id=f["id"], callsign=f["callsign"], departure=f["departure"],
                                    arrival=f["arrival"], target_id=f["pilot_id"], target_name=f["pilot_name"],
                                    target_role="pilote", at=aware(f["updated_at"])))
     done = {(r["flight_id"], r["target_id"]) async for r in
             db.reviews.find({"author_id": user["id"]}, {"_id": 0, "flight_id": 1, "target_id": 1})}
-    # Snooze « plus tard » : masquer 24 h
-    now = utcnow()
-    snoozed = {
-        (s["flight_id"], s["target_id"])
-        async for s in db.review_snoozes.find(
-            {"user_id": user["id"], "until": {"$gt": now}},
-            {"_id": 0, "flight_id": 1, "target_id": 1},
-        )
-    }
-    return sorted(
-        [i for i in out if (i.flight_id, i.target_id) not in done and (i.flight_id, i.target_id) not in snoozed],
-        key=lambda i: i.at,
-        reverse=True,
-    )
+    done |= {(d["flight_id"], d["target_id"]) async for d in
+             db.review_dismissals.find({"user_id": user["id"]}, {"_id": 0, "flight_id": 1, "target_id": 1})}
+    # « Plus tard » (controllers only): the end-of-flight window closes, the bell keeps the reminder until the deadline
+    snoozed = {(s["flight_id"], s["target_id"]) async for s in
+               db.review_snoozes.find({"user_id": user["id"]}, {"_id": 0, "flight_id": 1, "target_id": 1})}
+    for i in out:
+        i.snoozed = (i.flight_id, i.target_id) in snoozed
+        i.deadline = i.at + REVIEW_WINDOW
+    return sorted([i for i in out if (i.flight_id, i.target_id) not in done], key=lambda i: i.at, reverse=True)
+
+
+async def _pending(user: dict, flight_id: str, target_id: str) -> Interaction:
+    i = next((x for x in await _interactions(user) if x.flight_id == flight_id and x.target_id == target_id), None)
+    if not i:
+        raise HTTPException(404, "Aucun avis en attente pour ce vol (délai de 24 h dépassé, ou déjà traité).")
+    return i
 
 
 @router.get("/reviews/interactions", response_model=list[Interaction])
@@ -173,20 +180,35 @@ async def history(q: str = Query("", max_length=40), status: str = Query("all", 
     return out
 
 
+class ReviewChoiceIn(BaseModel):
+    flight_id: str = Field(min_length=1, max_length=60)
+    target_id: str = Field(min_length=1, max_length=60)
+
+
 @router.post("/reviews/snooze")
-async def snooze_review(body: dict, user: dict = Depends(require("review:write"))):
-    """Reporter un avis : disparaît des demandes pendant 24 h."""
-    flight_id = (body.get("flight_id") or "").strip()
-    target_id = (body.get("target_id") or "").strip()
-    if not flight_id or not target_id:
-        raise HTTPException(422, "flight_id et target_id requis.")
-    until = utcnow() + timedelta(hours=24)
+async def snooze_review(body: ReviewChoiceIn, user: dict = Depends(require("review:write"))):
+    """« Plus tard » — controllers only: the end-of-flight window closes, the reminder stays in the bell (24 h)."""
+    i = await _pending(user, body.flight_id, body.target_id)
+    if i.target_role != "pilote":
+        raise HTTPException(403, "Le pilote donne son avis tout de suite, ou choisit de ne pas en laisser.")
     await db.review_snoozes.update_one(
-        {"user_id": user["id"], "flight_id": flight_id, "target_id": target_id},
-        {"$set": {"user_id": user["id"], "flight_id": flight_id, "target_id": target_id, "until": until, "at": utcnow()}},
+        {"user_id": user["id"], "flight_id": i.flight_id, "target_id": i.target_id},
+        {"$set": {"user_id": user["id"], "flight_id": i.flight_id, "target_id": i.target_id, "at": utcnow()}},
         upsert=True,
     )
-    return {"ok": True, "until": until}
+    return {"ok": True, "deadline": i.deadline}
+
+
+@router.post("/reviews/dismiss")
+async def dismiss_review(body: ReviewChoiceIn, user: dict = Depends(require("review:write"))):
+    """« Ne pas laisser d'avis »: the form and the reminder are gone for good."""
+    i = await _pending(user, body.flight_id, body.target_id)
+    await db.review_dismissals.update_one(
+        {"user_id": user["id"], "flight_id": i.flight_id, "target_id": i.target_id},
+        {"$set": {"user_id": user["id"], "flight_id": i.flight_id, "target_id": i.target_id, "at": utcnow()}},
+        upsert=True,
+    )
+    return {"ok": True}
 
 
 @router.get("/notifications")
@@ -199,9 +221,12 @@ async def my_notifications(user: dict = Depends(require("flight:read"))):
                 "id": f"review-{i.flight_id}-{i.target_id}",
                 "kind": "review",
                 "title": f"Avis à laisser — {i.callsign}",
-                "body": f"{i.target_name} ({i.target_role})",
+                "body": f"{i.target_name} ({'contrôleur' if i.target_role == 'atc' else 'pilote'}) · avant le "
+                        f"{i.deadline.strftime('%d/%m à %H:%M')} UTC",
                 "at": i.at,
                 "href": "/profile",
+                "flight_id": i.flight_id,
+                "target_id": i.target_id,
             })
     except Exception:
         pass

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { labels, locale, tr } from "@/lib/i18n";
 import { DONATE_URL } from "@/lib/siteConfig";
 import { ThemeBadge } from "@/components/ThemeDecor";
+import { ReviewPrompt, reviewKey } from "@/components/Reviews";
 export const DISCORD_INVITE = "https://discord.gg/xjhTqW3N7d";
 const SIDEBAR_KEY = "sc.sidebar.collapsed";
 const ADMIN_MODE_KEY = "sc.admin.uimode";
@@ -156,7 +157,7 @@ function LogoutButton() {
 }
 
 
-type Notif = { id: string; kind: string; title: string; body: string; unread?: boolean };
+type Notif = { id: string; kind: string; title: string; body: string; unread?: boolean; flight_id?: string; target_id?: string };
 
 function NotifBell({ user }: { user: User }) {
   const qc = useQueryClient();
@@ -206,6 +207,25 @@ function NotifBell({ user }: { user: User }) {
                   <p className="mt-0.5 whitespace-pre-line text-amber-50/90">{it.body}</p>
                 </div>
               ) : (
+                it.kind === "review" && it.flight_id && it.target_id ? (
+                  <button
+                    key={it.id}
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      window.dispatchEvent(new CustomEvent("sc-open-review", { detail: reviewKey({ flight_id: it.flight_id!, target_id: it.target_id! }) }));
+                    }}
+                    className="block w-full border-b border-border/50 px-2 py-1.5 text-left text-xs last:border-0 hover:bg-secondary/60"
+                    data-testid="notif-review"
+                  >
+                    <p className="flex items-center gap-1.5 font-semibold text-[#9CCBF5]">
+                      {it.title}
+                      {it.unread && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500" />}
+                    </p>
+                    <p className="text-muted-foreground">{it.body}</p>
+                    <p className="mt-0.5 text-[11px] font-semibold text-[#4AA8F0]">{tr("Cliquer pour donner l'avis")}</p>
+                  </button>
+                ) : (
                 <div key={it.id} className="border-b border-border/50 px-2 py-1.5 text-xs last:border-0">
                   <p className="flex items-center gap-1.5 font-semibold text-[#9CCBF5]">
                     {it.title}
@@ -213,6 +233,7 @@ function NotifBell({ user }: { user: User }) {
                   </p>
                   <p className="text-muted-foreground">{it.body}</p>
                 </div>
+                )
               ),
             )
           )}
@@ -469,6 +490,7 @@ export default function AppShell({ children }: { children: (user: User, mode: Ui
       </div>
       {me.data && <MobileNav user={me.data} mode={mode} />}
       {(me.data?.role === "atc" || me.data?.role === "admin") && <HandoverNotice />}
+      {me.data && <ReviewPrompt />}{/* role « aucun » was already sent to /mode above */}
     </div>
   );
 }

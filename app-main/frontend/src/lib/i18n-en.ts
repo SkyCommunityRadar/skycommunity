@@ -1,6 +1,20 @@
 // English translation of the interface — downloaded only by someone who picks English (lib/i18n.ts).
 // Key = the French text written in the code. Generated from the code, then checked by hand.
 export const EN: Record<string, string> = {
+  "Avis reporté : retrouvez-le dans la cloche des notifications jusqu'au {0}.": "Review postponed: find it in the notification bell until {0}.",
+  "Aucun avis laissé pour ce vol.": "No review left for this flight.",
+  "Ne laisser aucun avis pour ce vol ? Ce n'est plus possible ensuite.": "Leave no review for this flight? It cannot be given afterwards.",
+  "Ne pas laisser d'avis": "Don't leave a review",
+  "Plus tard": "Later",
+  "À la fin d'un vol où pilote et contrôleur ont échangé, pendant 24 h. Un seul avis par interaction, publié après modération.": "At the end of a flight where pilot and controller interacted, for 24 h. One review per interaction, published after moderation.",
+  "Avis de fin de vol": "End-of-flight review",
+  "Le vol est terminé : donnez votre avis sur l'échange, ou choisissez de ne pas en laisser.": "The flight has ended: rate the interaction, or choose not to.",
+  "Cliquer pour donner l'avis": "Click to give the review",
+  "Rappel mis en pause 24 h : vous pouvez laisser l'avis quand vous voulez avant la fin du délai.": "Reminder paused for 24 h: you can still leave the review any time before the deadline.",
+  "Avis possible jusqu'au {0}": "Review possible until {0}",
+  "rappel en pause": "reminder paused",
+  "Me le rappeler plus tard": "Remind me later",
+  "Uniquement après une interaction réelle sur un vol, dans les 3 jours qui suivent. Un seul avis par interaction, publié après modération.": "Only after a real interaction on a flight, within the following 3 days. One review per interaction, published after moderation.",
   "Espace Créateur": "Creator area",
   "Thème du site": "Site theme",
   "Thème du site changé": "Site theme changed",
