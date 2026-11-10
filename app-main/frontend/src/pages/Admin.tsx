@@ -530,6 +530,46 @@ function CreatorPanel() {
           </div>
         )}
       </div>
+      <ResetSite />
+    </div>
+  );
+}
+
+const RESET_PHRASE = "REMISE A ZERO";
+
+/** Créateur only: deletes every other account and all the activity before the launch of the site. */
+function ResetSite() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const reset = useMutation({
+    mutationFn: () => apiPost<Record<string, number>>("/admin/reset", { confirm: typed.trim() }),
+    onSuccess: (n) => {
+      setOpen(false);
+      setTyped("");
+      qc.invalidateQueries();
+      toast.success(tr("Site remis à zéro : {0} compte(s) et {1} vol(s) supprimés", [n.comptes ?? 0, n.flights ?? 0]));
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  return (
+    <div className="space-y-2 rounded-lg border border-red-500/40 bg-red-500/[0.06] p-3" data-testid="site-reset">
+      <p className="text-xs font-semibold uppercase tracking-wider text-red-300">{tr("Remise à zéro du site")}</p>
+      <p className="text-xs text-muted-foreground">{tr("Supprime tous les comptes sauf le vôtre (bloqués et suspendus compris), tous les vols, heures de vol et de contrôle, avis, signalements, plannings, absences, pré-ouvertures, annonces et le journal. Les fréquences ouvertes sont fermées. Le thème, le mode anti-raid et les règles d'inactivité sont gardés. Les membres retrouvent un compte vide à leur prochaine connexion.")}</p>
+      {open ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-red-300">{tr("Impossible à annuler. Tapez {0} pour confirmer.", [RESET_PHRASE])}</p>
+          <Input value={typed} maxLength={40} onChange={(e) => setTyped(e.target.value)} placeholder={RESET_PHRASE} data-testid="site-reset-input" />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="destructive" disabled={reset.isPending || typed.trim().toUpperCase() !== RESET_PHRASE} onClick={() => reset.mutate()} data-testid="site-reset-confirm">
+              {reset.isPending ? tr("Suppression…") : tr("Tout supprimer définitivement")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { setOpen(false); setTyped(""); }}>{tr("Annuler")}</Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="destructive" onClick={() => setOpen(true)} data-testid="site-reset-open">{tr("Remettre le site à zéro…")}</Button>
+      )}
     </div>
   );
 }

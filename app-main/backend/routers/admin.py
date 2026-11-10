@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from lib.engine import aware, utcnow
 from lib.events import log_event
+from lib.handover import close_positions
 from lib.security import NEW_ACCOUNT_HOURS, security_settings, set_lockdown
 from pydantic import BaseModel, Field
 from models.schemas import AdminUserPatch, FlightEvent, UserOut
@@ -153,6 +154,41 @@ async def delete_flights(body: IdsIn, user: dict = Depends(require("admin:flight
     if docs:
         await log_event("admin", f"{len(docs)} vol(s) supprimé(s)", user, None, ", ".join(d["callsign"] for d in docs))
     return {"deleted": len(docs), "skipped": []}
+
+
+# ---------- remise à zéro (créateur seulement) ----------
+
+RESET_PHRASE = "REMISE A ZERO"
+# Everything members, flights and controllers leave behind. Kept: the configuration of the site (db.settings: theme,
+# anti-raid, inactivity rules), the airport data, the frequencies and the bot outbox (the link with the bot).
+RESET_COLLECTIONS = ("flights", "reviews", "review_snoozes", "review_dismissals", "atc_handovers", "reports",
+                     "planning", "planning_requests", "absences", "preopenings", "announcements", "simbrief_drafts",
+                     "events")
+
+
+class ResetIn(BaseModel):
+    confirm: str = Field(max_length=40)
+
+
+@router.post("/reset")
+async def reset_site(body: ResetIn, user: dict = Depends(require("admin:users"))):
+    """Créateur only, for the launch of the site: deletes every other account (blocked and suspended ones included)
+    and all the activity, so that hours, flights and counters start again from zero. Members still on the Discord
+    server get a new, empty account when they sign in again."""
+    if not is_creator(user):
+        raise HTTPException(403, "Réservé au créateur.")
+    if body.confirm.strip().upper() != RESET_PHRASE:
+        raise HTTPException(400, f"Tapez {RESET_PHRASE} pour confirmer.")
+    # open positions are closed the usual way (as if each controller closed it) so the bot also closes their channels
+    await close_positions(await db.atc_positions.find({}, {"_id": 0}).to_list(None), "fermeture", None)
+    counts = {"comptes": (await db.users.delete_many({"id": {"$ne": user["id"]}})).deleted_count}
+    for name in RESET_COLLECTIONS:
+        counts[name] = (await db[name].delete_many({})).deleted_count
+    await db.atc_positions.delete_many({})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"atc_seconds": 0}, "$unset": {"inactivity": ""}})
+    await log_event("admin", "Remise à zéro du site", user, None,
+                    f"{counts['comptes']} compte(s), {counts['flights']} vol(s) supprimé(s)")
+    return counts
 
 
 # ---------- mode anti-raid ----------
