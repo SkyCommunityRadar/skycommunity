@@ -2,6 +2,7 @@ import { Component, lazy, Suspense, useEffect, useRef, type ReactNode } from "re
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { tr } from "@/lib/i18n";
+import ThemeDecor from "@/components/ThemeDecor";
 
 // Each page is its own download: a phone opening the login page does not load the map engine (~1 MB) first.
 // The loaders are shared by lazy() and by the idle prefetch below (a dynamic import() is only fetched once).
@@ -108,6 +109,8 @@ export default function App() {
   }, [loc.pathname]);
 
   return (
+    <>
+    <ThemeDecor />
     <PageErrorBoundary resetKey={loc.pathname}>
       <Suspense fallback={<PageLoading />}>
         <Routes>
@@ -131,5 +134,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </PageErrorBoundary>
+    </>
   );
 }

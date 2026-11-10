@@ -26,7 +26,8 @@ function whereNowRaw(f: FlightSummary): string {
             p.next_wp ? tr("vers {0}", [p.next_wp]) : null].filter(Boolean).join(" · ");
   }
   if (TAXIING_PHASES.has(phase)) return p.next_wp ? tr("roule vers {0}", [p.next_wp]) : tr("au roulage");
-  if (phase === "parking") return f.arr_gate ? tr("au poste {0}", [f.arr_gate.ref]) : tr("au parking");
+  const stand = phase === "parking" && f.returned_to_stand ? f.dep_gate : f.arr_gate;
+  if (phase === "parking") return stand ? tr("au poste {0}", [stand.ref]) : tr("au parking");
   if (phase === "point_attente") return tr("au point d'attente");
   if (phase === "atterrissage") return tr("sur la piste");
   return f.dep_gate ? tr("au poste {0}", [f.dep_gate.ref]) : "";

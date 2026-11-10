@@ -9,12 +9,13 @@ import { PhaseBadge } from "@/components/Badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
 import { errMsg, useFlights } from "@/lib/hooks";
 import { PHASE_LABELS, ROLE_LABELS, fmtDateTime } from "@/lib/phases";
 import type { FlightDetail, FlightEvent, FlightSummary, User } from "@/lib/types";
 
 import { tr } from "@/lib/i18n";
+import { THEMES, useSiteTheme, type SiteTheme } from "@/lib/theme";
 type UserPatch = { disabled?: boolean; ban_hours?: number; ban_reason?: string };
 
 function blockedLabel(u: User): string | null {
@@ -426,6 +427,110 @@ function AntiRaid() {
   );
 }
 
+type Announcement = { id: string; title: string; body: string; by: string | null; at: string };
+
+/** Créateur only: the seasonal theme of the site and announcements sent to every member's notifications. */
+function CreatorPanel() {
+  const qc = useQueryClient();
+  const theme = useSiteTheme();
+  const setTheme = useMutation({
+    mutationFn: (t: SiteTheme) => apiPut("/site/theme", { theme: t }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["site-theme"] });
+      toast.success(tr("Thème du site changé"));
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const list = useQuery<Announcement[]>({ queryKey: ["announcements"], queryFn: () => apiGet<Announcement[]>("/site/announcements") });
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  const send = useMutation({
+    mutationFn: () => apiPost("/site/announcements", { title: title.trim(), body: body.trim() }),
+    onSuccess: () => {
+      setTitle("");
+      setBody("");
+      setConfirm(false);
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success(tr("Annonce envoyée à tous les membres"));
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => apiDelete(`/site/announcements/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success(tr("Annonce retirée"));
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const current = theme.data?.theme ?? "standard";
+  const ready = title.trim().length >= 2 && body.trim().length >= 2;
+  return (
+    <div className="space-y-4 rounded-xl border border-amber-400/40 bg-amber-400/[0.04] p-4" data-testid="creator-panel">
+      <p className="text-sm font-semibold text-amber-200">{tr("Espace Créateur")}</p>
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("Thème du site")}</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              disabled={setTheme.isPending}
+              onClick={() => t.id !== current && setTheme.mutate(t.id)}
+              className={`rounded-lg border p-3 text-left text-xs transition-colors ${t.id === current ? "border-amber-400 bg-amber-400/15" : "border-border bg-background/40 hover:bg-secondary"}`}
+              data-testid={`theme-${t.id}`}
+            >
+              <span className="block text-lg">{t.emoji}</span>
+              <span className="block font-semibold">{tr(t.label)}{t.id === current ? ` · ${tr("actif")}` : ""}</span>
+              <span className="block text-muted-foreground">{tr(t.hint)}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">{tr("Visible par tous les membres, page de connexion comprise, dans les 5 minutes (tout de suite pour qui recharge la page).")}</p>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("Annonce à tous les membres")}</p>
+        <Input value={title} maxLength={80} onChange={(e) => { setTitle(e.target.value); setConfirm(false); }} placeholder={tr("Titre (ex. Soirée ATC samedi 21 h)")} data-testid="announcement-title" />
+        <textarea
+          value={body}
+          maxLength={600}
+          onChange={(e) => { setBody(e.target.value); setConfirm(false); }}
+          placeholder={tr("Message")}
+          rows={3}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[#4AA8F0]"
+          data-testid="announcement-body"
+        />
+        {confirm ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-amber-200">{tr("Envoyer cette annonce dans les notifications de tous les membres ?")}</span>
+            <Button size="sm" onClick={() => send.mutate()} disabled={send.isPending} data-testid="announcement-confirm">{tr("Oui, envoyer")}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>{tr("Annuler")}</Button>
+          </div>
+        ) : (
+          <Button size="sm" disabled={!ready} onClick={() => setConfirm(true)} data-testid="announcement-send">{tr("Envoyer l'annonce")}</Button>
+        )}
+        {(list.data ?? []).length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <p className="text-[11px] text-muted-foreground">{tr("Annonces envoyées (visibles 30 jours dans les notifications)")}</p>
+            {(list.data ?? []).slice(0, 10).map((a) => (
+              <div key={a.id} className="flex items-start gap-2 rounded-md border border-border bg-background/40 px-2.5 py-1.5 text-xs">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{a.title}</p>
+                  <p className="text-muted-foreground">{fmtDateTime(a.at)}</p>
+                </div>
+                <Button size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(a.id)} data-testid="announcement-delete">{tr("Retirer")}</Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   return (
     <AppShell>
@@ -435,6 +540,7 @@ export default function Admin() {
         ) : (
           <div className="p-5 space-y-4 h-full overflow-y-auto">
             <h1 className="text-xl font-semibold tracking-tight">{tr("Administration")}</h1>
+            {me.access.creator && <CreatorPanel />}
             <AntiRaid />
             <Tabs defaultValue="users">
               <TabsList>

@@ -28,6 +28,17 @@ function nearGround(g: Ground, lat: number, lon: number, maxM = 60): boolean {
   return false;
 }
 
+/** Closest item within `maxM` metres of a click, or null. */
+function nearestWithin<T extends { lat: number; lon: number }>(items: T[], lat: number, lon: number, maxM: number): T | null {
+  const kx = 111_320 * Math.cos((lat * Math.PI) / 180), ky = 110_540;
+  let best: T | null = null, bestD = maxM;
+  for (const it of items) {
+    const d = Math.hypot((it.lon - lon) * kx, (it.lat - lat) * ky);
+    if (d <= bestD) { best = it; bestD = d; }
+  }
+  return best;
+}
+
 export interface FlightEditing {
   mode: MapMode;
   setMode: (m: MapMode) => void;
@@ -194,6 +205,27 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
       },
     );
   };
+  // A click next to a holding point / stand picks the destination, even when the taxiway under it caught the click
+  // (otherwise it became one more route point and the destination stayed « pas encore cliquée »).
+  const pickDestinationAt = (lat: number, lon: number): boolean => {
+    const g = editingKind === "taxi_in" ? arr : dep;
+    if (!g || !f) return false;
+    if (editingKind === "taxi_out" || (mode === "reject_hold" && points.length > 0)) {
+      const h = nearestWithin(g.holdings.filter((x) => x.ref), lat, lon, 30);
+      if (h) {
+        setDestination({ ref: h.ref, lat: h.lat, lon: h.lon });
+        return true;
+      }
+    }
+    if ((editingKind === "taxi_in" || mode === "reject_gate") && points.length > 0) {
+      const gt = nearestWithin(g.gates, lat, lon, 20);
+      if (gt) {
+        setDestGate(gt.ref);
+        return true;
+      }
+    }
+    return false;
+  };
   const onMapClick = (lat: number, lon: number) => {
     if (!f) return;
     if (mode === "holding") {
@@ -207,6 +239,7 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
     // Roulage : uniquement sur les voies de l'aéroport concerné
     if (drawing) {
       const g = editingKind === "taxi_in" ? arr : dep;
+      if (pickDestinationAt(lat, lon)) return;
       if (g && !nearGround(g, lat, lon)) {
         toast.info(tr("Point hors de l'aéroport : cliquez sur une voie de {0}.", [g.icao]));
         return;
@@ -258,7 +291,7 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
     onHoldingClick:
       mode === "holding" && f?.can_pick_holding
         ? (_icao, h) => pickHolding(h)
-        : editingKind === "taxi_out" || mode === "reject_hold"
+        : editingKind === "taxi_out" || (mode === "reject_hold" && points.length > 0) // the exit first, then the holding points appear
           ? (icao, h) => {
               if (icao === f?.departure) setDestination({ ref: h.ref, lat: h.lat, lon: h.lon });
             }
@@ -269,6 +302,7 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
             toast.info(tr("Point hors de l'aéroport : cliquez sur une voie de {0}.", [drawingIcao]));
             return;
           }
+          if (pickDestinationAt(lat, lon)) return;
           setPoints([...points, [Number(lat.toFixed(6)), Number(lon.toFixed(6))]]);
         }
       : undefined,
@@ -305,7 +339,9 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
           : editingKind === "taxi_in" || rejecting
             ? points.length === 0
               ? tr("Cliquez le taxiway de sortie de piste")
-              : tr("Cliquez les voies suivantes, jusqu'à la destination")
+              : mode === "reject_hold"
+                ? tr("Cliquez les voies suivantes, puis le point d'attente (cercle orange)")
+                : tr("Cliquez les voies suivantes, puis le poste d'arrivée")
             : editingKind
             ? tr("Tracé du roulage : cliquez les voies dans l'ordre, point par point")
             : tr("Cliquez sur la carte pour positionner l'avion"),

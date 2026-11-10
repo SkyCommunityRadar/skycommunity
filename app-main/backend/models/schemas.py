@@ -204,6 +204,7 @@ class ActionInfo(BaseModel):
 
 
 class FlightSummary(BaseModel):
+    returned_to_stand: bool = False  # back at its departure stand after an interrupted take-off
     id: str
     callsign: str
     pilot_id: str

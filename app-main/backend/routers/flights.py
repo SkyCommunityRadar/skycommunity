@@ -29,6 +29,7 @@ async def record_atc_presence(user: dict, now) -> None:
             inc = gap
     await db.users.update_one({"id": user["id"]}, {"$set": {"atc_last_seen": now}, "$inc": {"atc_seconds": inc}})
 DEP_GATE_PHASES = {"preparation"}
+TAKEOFF_NUDGE_MAX_NM = 1.0
 DIR_FR = {"N": "le nord", "NE": "le nord-est", "E": "l'est", "SE": "le sud-est", "S": "le sud",
           "SW": "le sud-ouest", "W": "l'ouest", "NW": "le nord-ouest"}
 
@@ -226,6 +227,8 @@ async def do_action(flight_id: str, body: ActionIn, user: dict = Depends(require
     if f["phase"] not in a["frm"]:
         raise HTTPException(409, f"Transition refusée : « {a['label']} » impossible depuis l'état "
                                  f"« {PHASES[f['phase']]} ».")
+    if body.action == "repartir" and not f.get("returned_to_stand"):
+        raise HTTPException(409, "« Repartir en vol » n'existe qu'après un retour au poste suite à un décollage interrompu.")
     if body.action == "go_around" and not go_around_possible(f, utcnow()):
         raise HTTPException(409, "La remise de gaz se fait en courte finale (moins de 12 NM de la piste) ou après le toucher.")
     now = utcnow()
@@ -354,7 +357,7 @@ async def step(flight_id: str, body: StepIn, user: dict = Depends(require("fligh
     authorize(user, "flight:act", f)
     check_version(f, body.version)
     ensure_control(f, user, ctx := await ctx_for(user, utcnow()))
-    to = step_target(f["phase"], body.direction)
+    to = None if f.get("returned_to_stand") else step_target(f["phase"], body.direction)
     if not to:
         raise HTTPException(409, f"Aucune étape {'suivante' if body.direction == 'next' else 'précédente'} possible "
                                  f"depuis « {PHASES.get(f['phase'], f['phase'])} ».")
@@ -403,6 +406,12 @@ async def nudge(flight_id: str, body: NudgeIn, user: dict = Depends(require("fli
         await save(f, body.version)
         await log_event("position", "Position ajustée dans le hold", user, f, note or f"hold sur {ident}")
         return detail(f, user, now, ctx)
+    if f["phase"] == "decollage":
+        # take-off: small steps only, a click must never skip the climb (« en route » comes 5 NM after lift-off)
+        if body.waypoint:
+            raise HTTPException(409, "Pendant le décollage, avancez l'avion par petits pas (pas de saut de point).")
+        if body.delta_nm is not None:
+            body.delta_nm = max(-TAKEOFF_NUDGE_MAX_NM, min(TAKEOFF_NUDGE_MAX_NM, body.delta_nm))
     if body.waypoint and track == "air":
         cums = [w["cum_nm"] for w in f["route"]]
         if body.waypoint == "next":
@@ -434,6 +443,9 @@ async def set_gates(flight_id: str, body: GatesIn, user: dict = Depends(require(
     if f["phase"] not in ACTIVE:
         raise HTTPException(409, "Le vol est clôturé.")
     ctx = await ctx_for(user, utcnow())
+    if user["role"] == "pilote" and ctx.responsible(f):
+        r = ctx.responsible(f)
+        raise HTTPException(403, f"Vol contrôlé par {r['callsign']} : c'est le contrôleur qui choisit les postes.")
     changes = []
     if body.dep_gate != (f.get("dep_gate") or {}).get("ref"):
         if f["phase"] not in DEP_GATE_PHASES:
@@ -604,10 +616,9 @@ async def move_profile_marker(flight_id: str, body: ProfileMarkerIn, user: dict 
     check_version(f, body.version)
     now = utcnow()
     ctx = await ctx_for(user, now)
-    if f["pilot_id"] != user["id"]:
-        if user["role"] not in ("atc", "admin"):
-            raise HTTPException(403, "Ce vol appartient à un autre pilote.")
-        ensure_control(f, user, ctx)
+    if f["pilot_id"] != user["id"] and user["role"] not in ("atc", "admin"):
+        raise HTTPException(403, "Ce vol appartient à un autre pilote.")
+    ensure_control(f, user, ctx)  # a controlled flight: only its controller changes it, not the pilot
     if f["phase"] not in ACTIVE:
         raise HTTPException(409, "Le vol est clôturé.")
     old = marker_nm(f, body.marker)

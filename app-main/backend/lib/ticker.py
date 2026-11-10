@@ -12,7 +12,7 @@ from datetime import timedelta
 from lib import handover
 from lib.control import record_controllers
 from lib.db import db
-from lib.engine import end_holding, hold_entered_at, hold_lap_s, leave_holding_at, LINEUP_HOLD_S, PHASES, TRACK_OF, approach_target, compute_position, enter_phase, lined_up_since, utcnow
+from lib.engine import threshold_nm, end_holding, hold_entered_at, hold_lap_s, leave_holding_at, LINEUP_HOLD_S, PHASES, TRACK_OF, approach_target, compute_position, enter_phase, lined_up_since, utcnow
 from lib.events import log_event
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,8 @@ async def tick_once() -> None:
                         await log_event("passage", f"Passage estimé du point {f['route'][i]['ident']}", None, f)
             if f["phase"] == "decollage" and pos["distance_nm"] >= min(5.0, pos["total_nm"] * 0.05):
                 await _auto(f, "en_route", "Montée initiale terminée (automatique)", now)
+            elif f["phase"] == "approche" and not pos["paused"] and pos["distance_nm"] >= threshold_nm(f) - 0.02:
+                await _auto(f, "atterrissage", "Atterrissage (automatique, passage du seuil de piste)", now)
             elif f["phase"] == "en_route" and not pos["paused"]:
                 # first fix of the arrival STAR reached (or the top of descent when the plan has no STAR)
                 target, _ = approach_target(f)
@@ -97,7 +99,7 @@ async def tick_once() -> None:
         elif f["phase"] == "roulage_arrivee" and pos["track"] == "taxi_in" and _arrived(pos):
             await _auto(f, "parking", "Arrivé au parking (automatique)", now)
         elif f["phase"] == "retour_parking" and pos["track"] == "taxi_back" and _arrived(pos):
-            await _auto(f, "preparation", "Retour au poste de stationnement (automatique)", now)
+            await _auto(f, "parking", "Retour au poste de stationnement (automatique)", now)
 
 
 SWEEP_S = float(os.environ.get("ACTIVITY_SWEEP_SECONDS", "600"))

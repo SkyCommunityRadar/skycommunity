@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import HandoverNotice from "@/components/HandoverNotice";
-import { Bell, LogOut, Radar, PlusCircle, History, UserRound, ShieldCheck, Trophy, PanelLeftClose, PanelLeftOpen, Lock, CalendarDays, Activity, AlertTriangle, Heart } from "lucide-react";
+import { Bell, Megaphone, LogOut, Radar, PlusCircle, History, UserRound, ShieldCheck, Trophy, PanelLeftClose, PanelLeftOpen, Lock, CalendarDays, Activity, AlertTriangle, Heart } from "lucide-react";
 import { ApiError, apiGet, apiPost } from "@/lib/api";
 import { errMsg, useMe } from "@/lib/hooks";
 import { endSession } from "@/lib/session";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { labels, locale, tr } from "@/lib/i18n";
 import { DONATE_URL } from "@/lib/siteConfig";
+import { ThemeBadge } from "@/components/ThemeDecor";
 export const DISCORD_INVITE = "https://discord.gg/xjhTqW3N7d";
 const SIDEBAR_KEY = "sc.sidebar.collapsed";
 const ADMIN_MODE_KEY = "sc.admin.uimode";
@@ -155,41 +156,65 @@ function LogoutButton() {
 }
 
 
+type Notif = { id: string; kind: string; title: string; body: string; unread?: boolean };
+
 function NotifBell({ user }: { user: User }) {
-  const q = useQuery<{ items: { id: string; kind: string; title: string; body: string }[]; count: number }>({
+  const qc = useQueryClient();
+  const q = useQuery<{ items: Notif[]; count: number; unread?: number }>({
     queryKey: ["notifications"],
     queryFn: () => apiGet("/notifications"),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
     enabled: !!user,
   });
   const [open, setOpen] = useState(false);
   const count = q.data?.count ?? 0;
+  const unread = q.data?.unread ?? 0; // red badge, like on a phone: what arrived since the bell was last opened
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && unread > 0) {
+      apiPost("/notifications/seen", {}).then(() => qc.invalidateQueries({ queryKey: ["notifications"] })).catch(() => undefined);
+    }
+  };
   return (
     <div className="relative" data-testid="notif-bell">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         className="relative rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        title={tr("Notifications")}
+        title={unread > 0 ? tr("{0} nouvelle(s) notification(s)", [unread]) : tr("Notifications")}
       >
         <Bell className="h-5 w-5" />
-        {count > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black">
-            {count > 9 ? "9+" : count}
+        {unread > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-[#070D1A]" data-testid="notif-unread">
+            {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-2 max-h-80 w-72 overflow-y-auto rounded-lg border border-border bg-[#0B1220] p-2 shadow-xl">
+        <div className="absolute right-0 z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-lg border border-border bg-[#0B1220] p-2 shadow-xl">
           {count === 0 ? (
             <p className="p-2 text-xs text-muted-foreground">{tr("Aucune notification")}</p>
           ) : (
-            (q.data?.items ?? []).map((it) => (
-              <div key={it.id} className="border-b border-border/50 px-2 py-1.5 text-xs last:border-0">
-                <p className="font-semibold text-[#9CCBF5]">{it.title}</p>
-                <p className="text-muted-foreground">{it.body}</p>
-              </div>
-            ))
+            (q.data?.items ?? []).map((it) =>
+              it.kind === "announcement" ? (
+                <div key={it.id} className="my-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs" data-testid="notif-announcement">
+                  <p className="flex items-center gap-1.5 font-semibold text-amber-200">
+                    <Megaphone className="h-3.5 w-3.5 shrink-0" /> {it.title}
+                    {it.unread && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500" />}
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-line text-amber-50/90">{it.body}</p>
+                </div>
+              ) : (
+                <div key={it.id} className="border-b border-border/50 px-2 py-1.5 text-xs last:border-0">
+                  <p className="flex items-center gap-1.5 font-semibold text-[#9CCBF5]">
+                    {it.title}
+                    {it.unread && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500" />}
+                  </p>
+                  <p className="text-muted-foreground">{it.body}</p>
+                </div>
+              ),
+            )
           )}
         </div>
       )}
@@ -203,6 +228,7 @@ function TopBar({ user, mode }: { user: User | undefined; mode: UiMode }) {
       <Link to="/" className="flex shrink-0 items-center gap-2.5" data-testid="brand-link">
         <img src="/logo.png" alt={tr("SkyCommunity")} className="h-8 w-8 rounded-full bg-white ring-2 ring-[#4AA8F0]/40 sm:h-9 sm:w-9" data-testid="logo-slot" />
         <span className="hidden whitespace-nowrap text-base font-bold tracking-tight sm:inline">{tr("SkyCommunity")}{" "}<span className="text-[#4AA8F0]">{tr("Radar")}</span>
+          <ThemeBadge />
         </span>
       </Link>
       <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-3">

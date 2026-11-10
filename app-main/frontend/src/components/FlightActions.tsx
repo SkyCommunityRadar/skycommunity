@@ -29,7 +29,7 @@ const DIRS = [
 const ICONS: Record<string, LucideIcon> = {
   repoussage: MoveDown, roulage: Route, point_attente: Hand, alignement: MoveRight, decollage: PlaneTakeoff, approche: Navigation,
   go_around: Undo2, atterrissage: PlaneLanding, roulage_arrivee: Route, parking: SquareParking, reprendre: Play,
-  suspendre: Pause, terminer: Flag, annuler: CircleX, interrompre_decollage: Undo2, retour_parking: SquareParking,
+  suspendre: Pause, terminer: Flag, annuler: CircleX, interrompre_decollage: Undo2, retour_parking: SquareParking, retour_poste: SquareParking, repartir: PlaneTakeoff,
 };
 // actions that end or interrupt the flight: kept apart, in red, never next to the normal progression
 const DANGER = new Set(["annuler", "suspendre"]);
@@ -109,9 +109,7 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
       ? setReject(a.code)
       : a.code === "repoussage"
       ? setAskPush(true)
-      : a.confirm || DANGER.has(a.code)
-        ? setPending({ label: tr(a.label), danger: DANGER.has(a.code), run: action(a.code, tr(a.label)) })
-        : action(a.code, tr(a.label))();
+      : setPending({ label: tr(a.label), danger: DANGER.has(a.code), run: action(a.code, tr(a.label)) }); // every step asks first
 
   const confirmBox = pending && (
           <motion.div

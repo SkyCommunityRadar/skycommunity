@@ -37,11 +37,13 @@ GROUND = {"preparation", "repoussage", "roulage", "point_attente", "alignement",
           "roulage_arrivee", "retour_parking", "parking", "termine", "annule"}
 AIR_PHASES = {"decollage", "en_route", "approche"}
 TRACK_OF = {"roulage": "taxi_out", "alignement": "lineup", "decollage": "air", "en_route": "air", "approche": "air",
+            "atterrissage": "air",  # roll-out from the threshold; once on its exit (taxi_in) it waits for the taxi
             "roulage_arrivee": "taxi_in", "retour_parking": "taxi_back"}
 TAXI_TRACKS = ("taxi_out", "taxi_in", "taxi_back", "lineup")
 LINEUP_KT = 8.0  # entering the runway and turning onto the centreline
 LINEUP_HOLD_S = 0.0  # pas d'arrêt entre alignement et décollage (roulement continu)
 TAKEOFF_ROLL_KT = 45.0  # roulis au décollage (plus lent que la croisière)
+ROLLOUT_KT = 60.0  # average speed of the landing roll (touchdown ~130 kt down to taxi speed)
 TAKEOFF_ROLL_NM = 1.2  # distance en NM pendant laquelle on reste à TAKEOFF_ROLL_KT
 TAXI_PHASES = ("roulage", "roulage_arrivee", "retour_parking")  # where the « Stop / Reprendre » button exists
 
@@ -65,6 +67,9 @@ ACTIONS: dict[str, dict] = {
     "atterrissage": dict(label="Atterrissage", frm=["approche"], to="atterrissage", roles=P, confirm=True),
     "go_around": dict(label="Remise de gaz", frm=["approche", "atterrissage"], to="approche", roles=P, confirm=True),
     "roulage_arrivee": dict(label="Début du roulage à l'arrivée", frm=["atterrissage"], to="roulage_arrivee", roles=P),
+    # take-off interrupted, back to the stand: « Au parking », then the pilot (or the controller) chooses
+    "retour_poste": dict(label="Arrivé à la porte", frm=["retour_parking"], to="parking", roles=P, confirm=True),
+    "repartir": dict(label="Repartir en vol", frm=["parking"], to="preparation", roles=P, confirm=True),
     "parking": dict(label="Arrivée au parking", frm=["roulage_arrivee"], to="parking", roles=P),
     # Le vol se termine au parking : par le pilote, ou par l'ATC quand le vol est contrôlé (ensure_control).
     "terminer": dict(label="Terminer le vol", frm=["parking"], to="termine", roles=P, confirm=True),
@@ -201,6 +206,8 @@ def current_distance(f: dict, now: datetime) -> float:
                 else:
                     _, dists, times = _air(f)
                     d = interp(times, dists, interp(dists, times, d) + elapsed)
+            elif f.get("phase") == "atterrissage":
+                d = float(p.get("anchor_dist", 0.0)) + elapsed * ROLLOUT_KT / 3600.0  # décélération sur la piste
             else:
                 _, dists, times = _air(f)
                 d = interp(times, dists, interp(dists, times, d) + elapsed)
@@ -474,6 +481,8 @@ def enter_phase(f: dict, to: str, now: datetime) -> None:
         f["manual_position"] = None
     if to != "suspendu" and f["phase"] != "suspendu":
         f["progress"]["hold"] = False  # a « Stop » belongs to one phase: the next one starts moving again
+    if to == "parking" and f["phase"] == "retour_parking":
+        f["returned_to_stand"] = True  # at its DEPARTURE stand: « Repartir en vol » or « Terminer le vol »
     f["phase"] = to
     if to != "alignement":
         f["takeoff_cleared"] = False
@@ -485,6 +494,9 @@ def enter_phase(f: dict, to: str, now: datetime) -> None:
     track = f["progress"].get("track")
     if to == "preparation":
         f["pushback_to"] = None  # back on the stand: a new pushback will be chosen
+        if f.get("returned_to_stand"):  # leaves again after an interrupted take-off: same route, taxi to redo
+            f.update(returned_to_stand=False, taxi_out=None, taxi_back=None, holding_point=None, lineup=None,
+                     takeoff_at=None, block_on_at=None)
     if to == "repoussage":
         f["pushback_at"] = now
     if to in ("preparation", "repoussage"):
@@ -536,9 +548,15 @@ def enter_phase(f: dict, to: str, now: datetime) -> None:
         if track_length(f, "taxi_in") > 0:
             set_track(f, "taxi_in", 0.0, now)  # on the runway exit, waits for "début du roulage"
         else:
-            set_track(f, "air", track_length(f, "air"), now)
+            # touchdown on the threshold, then roll-out along the runway (asked from further away: put on the threshold)
+            thr = threshold_nm(f)
+            here = f["progress"]["anchor_dist"] if track == "air" else 0.0
+            if track != "air" or here < thr - 0.5:
+                set_track(f, "air", thr, now)
     elif to == "roulage_arrivee":
         set_track(f, "taxi_in", 0.0, now)
+    elif to == "parking" and track == "taxi_back":
+        set_track(f, "taxi_back", track_length(f, "taxi_back"), now)  # on its stand
     elif to in ("parking", "termine") and track in ("taxi_in", "air"):
         set_track(f, "taxi_in", track_length(f, "taxi_in"), now)
 
@@ -568,6 +586,8 @@ def allowed_actions(f: dict, role: str, is_owner: bool, controlled: bool = False
             continue
         if code in REJECT_ACTIONS and not reject_window_open(f, utcnow()):
             continue  # the take-off can only be interrupted during its first minute
+        if code == "repartir" and not f.get("returned_to_stand"):
+            continue  # only after an interrupted take-off; at the arrival the flight simply ends
         if code == "go_around" and not go_around_possible(f, utcnow()):
             continue  # only on short final or after touchdown
         out.append(dict(code=code, label=a["label"], confirm=bool(a.get("confirm")),
@@ -904,6 +924,14 @@ def nudge_in_hold(f: dict, delta_nm: float | None, laps: int, now: datetime) -> 
 
 GA_SPEED_KT = 160.0
 GA_NEAR_NM = 12.0  # the go-around exists on short final and after touchdown, not 60 NM away
+
+
+def threshold_nm(f: dict) -> float:
+    """Distance along the route of the arrival runway threshold (the last « RWxx » point), else near the end."""
+    route = f["route"]
+    rw = route[-1].get("rwy")
+    k = next((k for k in range(len(route) - 1, 0, -1) if rw and route[k].get("ident") == f"RW{rw['ident']}"), None)
+    return route[k]["cum_nm"] if k is not None else max(0.0, route[-1]["cum_nm"] - 0.5)
 
 
 def go_around_possible(f: dict, now: datetime) -> bool:

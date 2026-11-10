@@ -22,7 +22,7 @@ from lib.db import client, ensure_indexes  # noqa: E402
 from lib.engine import utcnow  # noqa: E402
 from lib.ticker import run_forever  # noqa: E402
 from lib.security import MAX_BODY_BYTES, check_rate  # noqa: E402
-from routers import admin, airports, auth, flights, leaderboard, simbrief, strips, atc, cron, discord, community, planning, activity, bot, absences, reports  # noqa: E402
+from routers import admin, airports, auth, flights, leaderboard, simbrief, strips, atc, cron, discord, community, planning, activity, bot, absences, reports, site  # noqa: E402
 
 
 @asynccontextmanager
@@ -55,7 +55,7 @@ async def health():
     return {"ok": True, "server_time": utcnow().isoformat()}
 
 
-for module in (auth, flights, simbrief, airports, admin, leaderboard, strips, atc, cron, discord, community, planning, activity, bot, absences, reports):
+for module in (auth, flights, simbrief, airports, admin, leaderboard, strips, atc, cron, discord, community, planning, activity, bot, absences, reports, site):
     api_router.include_router(module.router)
 
 # The frontend calls /api on its own origin, so CORS is only needed for explicitly listed extra origins.

@@ -96,6 +96,8 @@ def airport_controller(positions: list[dict], icao: str, service: str) -> dict |
 def service_of(f: dict) -> tuple[str | None, str]:
     phase = f["phase"] if f["phase"] != "suspendu" else (f.get("prev_phase") or "preparation")
     side, service = PHASE_SERVICE.get(phase, ("dep", "GND"))
+    if phase == "parking" and f.get("returned_to_stand"):
+        side = "dep"  # back at its departure stand after an interrupted take-off
     icao = f["departure"] if side == "dep" else f["arrival"] if side == "arr" else None
     return icao, service
 

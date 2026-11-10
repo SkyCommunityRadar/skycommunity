@@ -2,7 +2,7 @@
 
 import re
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo.errors import DuplicateKeyError
@@ -228,5 +228,23 @@ async def my_notifications(user: dict = Depends(require("flight:read"))):
             })
     except Exception:
         pass
-    items.sort(key=lambda x: str(x.get("at") or ""), reverse=True)
-    return {"items": items[:40], "count": len(items)}
+    # annonces du Créateur à tous les membres (30 derniers jours)
+    since = utcnow() - timedelta(days=30)
+    async for a in db.announcements.find({"at": {"$gte": since}}, {"_id": 0}).sort("at", -1).limit(10):
+        items.append({"id": f"announcement-{a['id']}", "kind": "announcement", "title": a["title"], "body": a["body"],
+                      "at": a["at"], "href": None})
+    for it in items:
+        it["at"] = aware(it["at"]) if isinstance(it.get("at"), datetime) else None
+    items.sort(key=lambda x: x["at"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    items = items[:40]
+    seen = aware(user.get("notif_seen_at"))
+    for it in items:  # « nouveau » : arrivé depuis la dernière ouverture de la cloche
+        it["unread"] = bool(it["at"] and (not seen or it["at"] > seen))
+    return {"items": items, "count": len(items), "unread": sum(it["unread"] for it in items)}
+
+
+@router.post("/notifications/seen")
+async def notifications_seen(user: dict = Depends(require("flight:read"))):
+    """The bell was opened: everything shown so far is no longer new."""
+    await db.users.update_one({"id": user["id"]}, {"$set": {"notif_seen_at": utcnow()}})
+    return {"ok": True}

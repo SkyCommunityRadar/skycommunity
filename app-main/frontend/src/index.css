@@ -183,3 +183,19 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 /* phones: no grey flash on tap, no accidental double-tap zoom on buttons */
 button, a, [role="tab"] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+/* ---- Thèmes saisonniers (choisis par le Créateur, Administration) ---- */
+.theme-decor { position: fixed; inset: 0; pointer-events: none; z-index: 950; overflow: hidden; }
+.theme-particle {
+  position: absolute; top: -40px; opacity: 0.75; color: #fff; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+  animation-name: theme-fall; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform;
+}
+@keyframes theme-fall {
+  0% { transform: translate3d(0, -40px, 0) rotate(0deg); }
+  50% { transform: translate3d(var(--drift), 50vh, 0) rotate(180deg); }
+  100% { transform: translate3d(0, 105vh, 0) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) { .theme-decor { display: none; } }
+html[data-theme="noel"] [data-testid="top-bar"] { border-bottom: 2px solid transparent; border-image: repeating-linear-gradient(90deg, #dc2626 0 24px, #f8fafc 24px 32px, #16a34a 32px 56px, #f8fafc 56px 64px) 1; }
+html[data-theme="halloween"] [data-testid="top-bar"] { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, #f97316, #7c3aed, #f97316) 1; }
+html[data-theme="paques"] [data-testid="top-bar"] { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, #f9a8d4, #fde68a, #a7f3d0, #bfdbfe, #f9a8d4) 1; }

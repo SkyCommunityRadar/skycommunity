@@ -231,6 +231,7 @@ export interface ActionInfo {
 }
 
 export interface FlightSummary {
+  returned_to_stand?: boolean;
   id: string;
   callsign: string;
   pilot_id: string;

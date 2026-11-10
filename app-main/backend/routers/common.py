@@ -62,6 +62,7 @@ def summary(f: dict, now: datetime, ctx: Ctx | None = None) -> FlightSummary:
     return FlightSummary(
         controller_callsign=r["callsign"] if r else None,
         id=f["id"], callsign=f["callsign"], pilot_id=f["pilot_id"], pilot_name=f["pilot_name"],
+        returned_to_stand=bool(f.get("returned_to_stand")),
         aircraft_type=f["aircraft_type"], departure=f["departure"], arrival=f["arrival"], phase=f["phase"],
         prev_phase=f.get("prev_phase"), source="simbrief", version=f["version"],
         hold=bool(f["progress"].get("hold")), position=Position(**compute_position(f, now)),
@@ -198,8 +199,8 @@ def detail(f: dict, user: dict, now: datetime, ctx: Ctx) -> FlightDetail:
     pi = plan_info(f)
     sid, star = pi["sid"], pi["star"]
     taxi_out, taxi_in = active and ctx.can_taxi(f, "taxi_out"), active and ctx.can_taxi(f, "taxi_in")
-    dep_gate = active and (ctx.can_gate(f, "dep") if user["role"] != "pilote" else owner)
-    arr_gate = active and (ctx.can_gate(f, "arr") if user["role"] != "pilote" else owner)
+    dep_gate = active and (ctx.can_gate(f, "dep") if user["role"] != "pilote" else owner and not r)
+    arr_gate = active and (ctx.can_gate(f, "arr") if user["role"] != "pilote" else owner and not r)
     acts = allowed_actions(f, user["role"], owner, bool(r)) if may_act else []
     return FlightDetail(
         controller_name=r["controller"] if r else None, controller_callsign=r["callsign"] if r else None,
@@ -214,11 +215,11 @@ def detail(f: dict, user: dict, now: datetime, ctx: Ctx) -> FlightDetail:
         if f["phase"] == "retour_parking" and f.get("taxi_back") else None,
         # « Étape préc./suiv. » masquée si une action de phase mène déjà au même état (évite doublons
         # du type « Retour en route » + « Étape précédente : En route »)
-        step_prev=(
+        step_prev=None if f.get("returned_to_stand") else (
             prv if (prv := step_for(f["phase"], "prev", user["role"]) if active and may_act else None)
             and not any(ACTIONS[a["code"]]["to"] == prv for a in acts) else None
         ),
-        step_next=(
+        step_next=None if f.get("returned_to_stand") else (
             nxt if (nxt := step_for(f["phase"], "next", user["role"]) if active and may_act else None)
             and not any(ACTIONS[a["code"]]["to"] == nxt for a in acts) else None
         ),
@@ -234,7 +235,7 @@ def detail(f: dict, user: dict, now: datetime, ctx: Ctx) -> FlightDetail:
         reject_until=(aware(f.get("takeoff_at")) + timedelta(seconds=REJECT_WINDOW_S)) if f["phase"] == "decollage" and f.get("takeoff_at") else None,
         takeoff_cleared=bool(f.get("takeoff_cleared")) and f["phase"] == "alignement",
         lineup=(f.get("lineup") or {}).get("path") if f["phase"] in ("alignement", "decollage") else None,
-        can_edit_profile=active and (owner or may_act) and f["phase"] not in ("parking", "roulage_arrivee", "atterrissage"),
+        can_edit_profile=active and may_act and f["phase"] not in ("parking", "roulage_arrivee", "atterrissage"),
         toc_nm=next((w["cum_nm"] for w in f["route"] if w.get("ident") == "TOC"), None),
         tod_nm=next((w["cum_nm"] for w in f["route"] if w.get("ident") == "TOD"), None),
         can_edit_strip=active and ctx.can_edit_strip(f),
