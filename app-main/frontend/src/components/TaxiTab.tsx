@@ -1,10 +1,8 @@
-import { Fragment, useState, type ReactNode } from "react";
-import { Check, ChevronRight, MapPin, Pencil, PlaneLanding, PlaneTakeoff } from "lucide-react";
+import { Fragment, type ReactNode } from "react";
+import { ChevronRight, MapPin, Pencil, PlaneLanding, PlaneTakeoff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import GatePicker from "@/components/GatePicker";
 import TaxiEditor from "@/components/TaxiEditor";
-import { apiPut } from "@/lib/api";
-import { useFlightMutation, useGround } from "@/lib/hooks";
+import { useGround } from "@/lib/hooks";
 import { tr } from "@/lib/i18n";
 import type { FlightDetail } from "@/lib/types";
 import type { FlightEditing } from "@/lib/useFlightEditing";
@@ -49,50 +47,29 @@ const Pill = ({ children, tone = "route" }: { children: ReactNode; tone?: "route
   </span>
 );
 
-/** Stand of one side: shown as a chip, or picked from the airport's stands and saved on its own. */
-function GateRow({ f, side }: { f: FlightDetail; side: "dep" | "arr" }) {
-  const m = useFlightMutation(f.id);
+/** Stand of one side: shown as a chip, and chosen by clicking it directly on the map (like the holding point). */
+function GateRow({ f, side, ed }: { f: FlightDetail; side: "dep" | "arr"; ed: FlightEditing }) {
   const dep = side === "dep";
   const saved = (dep ? f.dep_gate?.ref : f.arr_gate?.ref) ?? null;
-  const [draft, setDraft] = useState(saved ?? "");
   const locked = dep
     ? f.phase !== "preparation" || !f.can_edit_dep_gate
     : !f.can_edit_arr_gate || (f.is_owner && !f.is_controller && f.arr_gate_by === "atc" && !f.can_control);
-  const dirty = !locked && (draft || null) !== saved;
-  const save = () =>
-    m.mutate({
-      fn: () =>
-        apiPut<FlightDetail>(`/flights/${f.id}/gates`, {
-          dep_gate: dep ? draft || null : f.dep_gate?.ref ?? null,
-          arr_gate: dep ? f.arr_gate?.ref ?? null : draft || null,
-          version: f.version,
-        }),
-      success: tr("Poste {0} enregistré", [draft || "—"]),
-    });
+  const picking = ed.mode === (dep ? "gate_dep" : "gate_arr");
   const note = !dep && saved ? (f.arr_gate_by === "atc" ? tr("assigné par l'ATC") : f.arr_gate_by === "pilote" ? tr("souhaité par le pilote") : null) : null;
+  const action = !locked && (
+    <Button size="sm" variant={picking ? "default" : "outline"} onClick={() => (picking ? ed.setMode("view") : ed.startGatePick(side))} data-testid={`gate-${side}-pick-on-map`}>
+      <MapPin className="h-3.5 w-3.5" /> {picking ? tr("Cliquez sur la carte…") : saved ? tr("Changer") : tr("Choisir sur la carte")}
+    </Button>
+  );
   return (
-    <Row label={dep ? tr("Poste de départ") : tr("Poste d'arrivée")}>
-      {locked ? (
-        saved ? (
-          <span className="flex flex-wrap items-center gap-2" data-testid={`gate-${side}-locked`}>
-            <Pill tone="stand">{saved}</Pill>
-            {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
-          </span>
-        ) : (
-          <span className="text-muted-foreground" data-testid={`gate-${side}-locked`}>{tr("Non défini")}</span>
-        )
+    <Row label={dep ? tr("Poste de départ") : tr("Poste d'arrivée")} action={action}>
+      {saved ? (
+        <span className="flex flex-wrap items-center gap-2" data-testid={`gate-${side}-current`}>
+          <Pill tone="stand">{saved}</Pill>
+          {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+        </span>
       ) : (
-        <div className="space-y-1.5">
-          <div className="flex items-start gap-2">
-            <div className="w-36"><GatePicker icao={dep ? f.departure : f.arrival} value={draft} onChange={setDraft} testId={`gate-${side}-input`} /></div>
-            {dirty ? (
-              <Button size="sm" onClick={save} disabled={m.isPending} data-testid={`gate-${side}-save`}>{tr("Enregistrer")}</Button>
-            ) : saved ? (
-              <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-emerald-300" data-testid="gate-saved"><Check className="h-3 w-3" />{tr("enregistré")}</span>
-            ) : null}
-          </div>
-          {note && !dirty && <p className="text-[11px] text-muted-foreground">{note}</p>}
-        </div>
+        <span className="text-muted-foreground" data-testid={`gate-${side}-current`}>{locked ? tr("Non défini") : tr("À choisir sur la carte.")}</span>
       )}
     </Row>
   );
@@ -130,15 +107,17 @@ function RouteRow({ f, kind, ed }: { f: FlightDetail; kind: "taxi_out" | "taxi_i
   const canEdit = out ? f.can_edit_taxi_out : f.can_edit_taxi_in;
   const gate = out ? f.dep_gate?.ref : f.arr_gate?.ref;
   const names = (t?.names ?? []).filter((n) => n && n !== "Stand");
+  const arrGround = useGround(out ? undefined : f.arrival);
+  const needGate = !out && !gate && (arrGround.data?.gates.length ?? 1) > 0; // arrival: the stand first, then the exit
   const action = canEdit && !editing && (
-    <Button size="sm" variant="outline" onClick={() => ed.startEdit(kind)} data-testid={`taxi-${kind}-edit`}>
+    <Button size="sm" variant="outline" disabled={needGate} title={needGate ? tr("Choisissez d'abord le poste d'arrivée") : undefined} onClick={() => ed.startEdit(kind)} data-testid={`taxi-${kind}-edit`}>
       <Pencil className="h-3.5 w-3.5" /> {t ? tr("Modifier") : tr("Tracer")}
     </Button>
   );
   return (
     <Row label={tr("Roulage")} action={action}>
       {editing ? (
-        <TaxiEditor flight={f} kind={kind} editing points={ed.points} setPoints={ed.setPoints} onPreview={ed.setDraftPath} onEdit={() => ed.startEdit(kind)} onDone={() => ed.setMode("view")} />
+        <TaxiEditor flight={f} kind={kind} editing points={ed.points} setPoints={ed.setPoints} onPreview={ed.setDraftPath} onEdit={() => ed.startEdit(kind)} onDone={() => ed.setMode("view")} destination={out ? ed.destination : null} />
       ) : t ? (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-1" data-testid={`taxi-${kind}-path`}>
@@ -158,7 +137,7 @@ function RouteRow({ f, kind, ed }: { f: FlightDetail; kind: "taxi_out" | "taxi_i
         <span className="text-muted-foreground" data-testid={`taxi-${kind}-empty`}>
           {out
             ? f.can_pick_holding ? tr("Pas encore de roulage : choisissez votre point d'attente.") : tr("Pas encore de roulage.")
-            : tr("Pas encore de roulage jusqu'au poste.")}
+            : needGate ? tr("Choisissez d'abord le poste d'arrivée, puis la sortie de piste.") : tr("Pas encore de roulage jusqu'au poste.")}
         </span>
       )}
     </Row>
@@ -169,27 +148,13 @@ export default function TaxiTab({ flight: f, ed }: { flight: FlightDetail; ed: F
   return (
     <div className="space-y-4" data-testid="taxi-tab">
       <Card icon={PlaneTakeoff} title={tr("Départ")} icao={f.departure} testId="taxi-card-dep">
-        <GateRow key={`dep-${f.dep_gate?.ref}`} f={f} side="dep" />
+        <GateRow f={f} side="dep" ed={ed} />
         {(f.can_pick_holding || f.holding_point) && <HoldingRow f={f} ed={ed} />}
         <RouteRow f={f} kind="taxi_out" ed={ed} />
       </Card>
       <Card icon={PlaneLanding} title={tr("Arrivée")} icao={f.arrival} testId="taxi-card-arr">
-        <GateRow key={`arr-${f.arr_gate?.ref}`} f={f} side="arr" />
+        <GateRow f={f} side="arr" ed={ed} />
         <RouteRow f={f} kind="taxi_in" ed={ed} />
-        {["atterrissage", "approche", "roulage_arrivee"].includes(f.phase) && f.can_edit_taxi_in && ed.mode !== "taxi_in" && (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="w-full"
-            disabled={!f.arr_gate}
-            onClick={() => ed.startEdit("taxi_in")}
-            data-testid="taxi-in-open-map"
-          >
-            {f.arr_gate
-              ? tr("Ouvrir le tracé de roulage à l'arrivée (sortie → {0})", [f.arr_gate.ref])
-              : tr("Choisissez d'abord la porte d'arrivée")}
-          </Button>
-        )}
       </Card>
       {!f.can_pick_holding && !f.holding_point && f.phase === "preparation" && !f.is_controller && f.controlled && (
         <p className="text-[11px] text-muted-foreground">

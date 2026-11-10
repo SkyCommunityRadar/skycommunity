@@ -66,13 +66,13 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
   const list = flights.data?.flights ?? [];
   const selected = sel.data && sel.data.id === selectedId ? sel.data : null;
   const depGround = useGround(selected?.departure);
-  const ed = useFlightEditing(selected, depGround.data);
+  const arrGround = useGround(selected?.arrival);
+  const ed = useFlightEditing(selected, depGround.data, "view", undefined, arrGround.data);
   // entering a taxi route / picking a holding point centres the map on the stand
   useEffect(() => {
     if (ed.focusAt) setFocus({ c: ed.focusAt, z: 16, k: ed.focusKey });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ed.focusKey]);
-  const arrGround = useGround(selected?.arrival);
   const [apFoundIcao, setApFoundIcao] = useState<string | null>(null);
   const apGround = useGround(apFoundIcao);
   const center: [number, number] | null = view ? [(view.bbox[0] + view.bbox[2]) / 2, (view.bbox[1] + view.bbox[3]) / 2] : null;
@@ -122,7 +122,7 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
           onSelect={(id) => select(id)}
           route={selected?.route}
           flownIndex={selected?.position.track === "air" ? selected.position.wp_index : undefined}
-          aircraftPos={selected?.position.track === "air" ? [selected!.position.lat, selected!.position.lon] : undefined}
+          aircraftPos={selected?.position.track === "air" ? (selected.holding?.entered ? (selected.holding.path[0] as [number, number]) : [selected.position.lat, selected.position.lon]) : undefined}
           holdPath={selected?.holding?.path}
           lineupPath={selected?.lineup ?? undefined}
           firs={show.fir && (view?.zoom ?? 0) <= 10 ? firQ.data?.features : undefined}
@@ -138,9 +138,9 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
           onHoldingClick={ed.onHoldingClick}
           onTaxiwayClick={ed.onTaxiwayClick}
           onGateClick={ed.onGateClick}
-          pickPoints={ed.pick?.points.map((x) => ({ ...x, selected: x.id === ed.pick?.selected }))}
-          onPickPoint={(id) => ed.setPicked(id)}
-          selectedHolding={selected?.holding_point}
+          pickPoints={ed.pickPoints}
+          onPickPoint={ed.onPickPoint}
+          selectedHolding={ed.editingKind === "taxi_out" ? ed.destination : selected?.holding_point}
           crosshair={ed.crosshair}
           pushHint={ed.pushHint}
           center={focus?.c}

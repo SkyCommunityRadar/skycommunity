@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from lib.auth import authorize, require
 from lib.db import db
-from lib.engine import reject_window_open, compute_position, hold_entered_at, start_holding, lined_up_since, marker_nm, move_marker, PUSH_MAX_M, PUSH_MIN_M, push_distance_m, TAXI_PHASES, ACTIONS, ACTIVE, AIR_PHASES, PHASES, arrival_taxi_origin, direct_to, taxi_block, enter_phase, rebase, snap_distance, \
+from lib.engine import go_around, reconcile_holding, reject_window_open, compute_position, hold_entered_at, start_holding, lined_up_since, marker_nm, move_marker, PUSH_MAX_M, PUSH_MIN_M, push_distance_m, TAXI_PHASES, ACTIONS, ACTIVE, AIR_PHASES, PHASES, taxi_origin, direct_to, taxi_block, enter_phase, rebase, snap_distance, \
     step_for, step_target, track_length, utcnow, aware
 from lib.events import log_event
 from lib.geo import haversine_nm
-from lib.osm import runway_exits, vacate_path, build_taxi_path, gate_ref, get_graph, get_ground
+from lib.osm import on_airport, runway_exits, vacate_path, build_taxi_path, gate_ref, get_graph, get_ground
 from models.schemas import (NavIn, ProfileMarkerIn, TaxiStopIn, RunwaysIn, ActionIn, HoldingIn, ControlIn, FlightDetail, FlightEvent, FlightsResponse, ForcePhaseIn, GatesIn,
                             NoteIn, NudgeIn, StepIn, TaxiIn)
 from routers.atc import heartbeat as atc_heartbeat
@@ -46,6 +46,19 @@ def _on_runway_roll(f: dict, now) -> tuple[float, float]:
     return pos["lat"], pos["lon"]
 
 
+@router.get("/{flight_id}/arrival-exits")
+async def arrival_exits(flight_id: str, user: dict = Depends(require("flight:read"))):
+    """Runway exits of the arrival runway, shown on the map when the arrival taxi is drawn. All of them, also those
+    behind the aircraft: choosing one brings the aircraft back to it."""
+    f = await load_flight(flight_id)
+    end = f["route"][-1]
+    rw = end.get("rwy")
+    if not rw:
+        return {"exits": []}
+    g = await get_graph(f["arrival"])
+    return {"exits": runway_exits(g, rw, rw.get("lat", end["lat"]), rw.get("lon", end["lon"]), allow_behind=True)[:60]}
+
+
 @router.get("/{flight_id}/rejected-options")
 async def rejected_options(flight_id: str, user: dict = Depends(require("flight:read"))):
     """Take-off interrupted: taxiways that leave the runway ahead of the aircraft, holding points and stands."""
@@ -78,7 +91,7 @@ async def rejected_takeoff(f: dict, body, user: dict, now) -> None:
         if not hp:
             raise HTTPException(422, "Choisissez le nouveau point d'attente.")
         try:
-            t = vacate_path(g, f["departure"], (lat, lon), ex["node"], g.nearest(hp["lat"], hp["lon"]))
+            t = vacate_path(g, f["departure"], (lat, lon), ex["node"], g.nearest(hp["lat"], hp["lon"]), (hp["lat"], hp["lon"]), "")
         except HTTPException as e:
             raise HTTPException(422, f"Roulage impossible ({e.detail}) : choisissez une autre sortie ou un autre point.")
         t["points"] = [[hp["lat"], hp["lon"]]]
@@ -159,7 +172,9 @@ async def align_taxi_out(f: dict) -> None:
     """The departure taxi starts where the aircraft really is: the end of the pushback when there was one (the point
     clicked on the map), otherwise the stand. Rebuilt on the same clicked points / holding point when that changes."""
     t = f.get("taxi_out")
-    if not t or not t.get("points") or t.get("rejected"):
+    # only before the aircraft starts taxiing: afterwards the route must not change under it (it stopped short of the
+    # holding point when this rebuilt the route on arrival), and a route changed during the taxi starts at the aircraft
+    if not t or not t.get("points") or t.get("rejected") or t.get("live") or f["phase"] not in ("preparation", "repoussage", "roulage"):
         return
     push = f.get("pushback_to") if f["phase"] in ("repoussage", "roulage") else None
     want = [push["lat"], push["lon"]] if push else None
@@ -167,8 +182,10 @@ async def align_taxi_out(f: dict) -> None:
         return
     gate = (f.get("dep_gate") or {}).get("ref")
     try:
+        hp = f.get("holding_point") or {}
         new = await build_taxi_path(f["departure"], t["points"], None if want else gate, None,
-                                    origin=(want[0], want[1]) if want else None)
+                                    origin=(want[0], want[1]) if want else None,
+                                    end_point=(hp["lat"], hp["lon"]) if hp.get("lat") is not None else None)
     except HTTPException:
         return  # no route from there: keep the previous one rather than nothing
     if want:
@@ -245,6 +262,8 @@ async def do_action(flight_id: str, body: ActionIn, user: dict = Depends(require
         if not PUSH_MIN_M <= dist <= PUSH_MAX_M:
             raise HTTPException(422, f"Le point de fin de repoussage doit être entre {PUSH_MIN_M:.0f} et {PUSH_MAX_M:.0f} m "
                                      f"du poste (ici {dist:.0f} m) : cliquez plus près de l'avion.")
+        if not on_airport(await get_ground(f["departure"]), body.pushback_to.lat, body.pushback_to.lon, None):
+            raise HTTPException(422, "Point hors de l'aéroport : cliquez sur l'aéroport de départ.")
     if f["phase"] not in a["frm"]:
         raise HTTPException(409, f"Transition refusée : « {a['label']} » impossible depuis l'état "
                                  f"« {PHASES[f['phase']]} ».")
@@ -279,10 +298,13 @@ async def do_action(flight_id: str, body: ActionIn, user: dict = Depends(require
         f["takeoff_cleared"] = True
         f["progress"]["hold"] = False
     elif cleared_lineup and before == "alignement":
+        rebase(f, now)
         f["takeoff_cleared"] = True
         f["progress"]["hold"] = False  # continue le mouvement d'alignement → décollage auto
     else:
         enter_phase(f, to, now)
+        if body.action == "go_around":
+            go_around(f, now)
         if to == "alignement":
             await lineup_on_taxiways(f)
         if cleared_lineup:
@@ -324,12 +346,14 @@ async def control(flight_id: str, body: ControlIn, user: dict = Depends(require(
         i = body.waypoint_index
         if i is None or not (0 <= i < len(f["route"])):
             raise HTTPException(400, "Index de point invalide.")
+        reconcile_holding(f, f["route"][i]["cum_nm"], now)
         p["anchor_dist"], f["manual_position"] = f["route"][i]["cum_nm"], None
         f["last_wp_index"] = i
         label, details = "Correction : point courant", f"Placé sur {f['route'][i]['ident']}"
     elif body.op == "set_progress":
         if body.progress_nm is None or not p.get("track"):
             raise HTTPException(400, "Aucune trajectoire active à ajuster.")
+        reconcile_holding(f, min(body.progress_nm, track_length(f, p["track"])), now)
         p["anchor_dist"] = min(body.progress_nm, track_length(f, p["track"]))
         f["manual_position"] = None
         label, details = "Correction : progression sur la trajectoire", f"{p['anchor_dist']:.1f} NM"
@@ -337,7 +361,9 @@ async def control(flight_id: str, body: ControlIn, user: dict = Depends(require(
         if body.lat is None or body.lon is None:
             raise HTTPException(400, "Coordonnées manquantes.")
         if body.mode == "snap" and p.get("track"):
-            p["anchor_dist"], f["manual_position"] = snap_distance(f, body.lat, body.lon), None
+            snapped = snap_distance(f, body.lat, body.lon)
+            reconcile_holding(f, snapped, now)
+            p["anchor_dist"], f["manual_position"] = snapped, None
             label = "Correction : position recalée sur la trajectoire"
         else:
             f["manual_position"] = {"lat": body.lat, "lon": body.lon}
@@ -415,27 +441,16 @@ async def nudge(flight_id: str, body: NudgeIn, user: dict = Depends(require("fli
     else:
         raise HTTPException(400, "Indiquez un décalage ou un point.")
     d = max(0.0, min(total, d))
-    # En hold : déplacer le fix d'attente avec l'avion (ne pas déformer le reste de la route)
-    if f.get("holding") and track == "air":
-        f["holding"]["fix_nm"] = d
-        # garder lat/lon du fix d'origine ; la distance seule change le long de la route
-        route = f.get("route") or []
-        if route:
-            # recalcule lat/lon au nouveau nm sans modifier les waypoints de la route
-            from lib.engine import _air, locate
-            pts, dists, _ = _air(f)
-            if pts and dists:
-                lat, lon, hdg, idx = locate(pts, dists, d)
-                f["holding"]["lat"] = lat
-                f["holding"]["lon"] = lon
+    # Le hold ne bouge jamais : avancer au-delà de son point y met fin, reculer ramène l'avion vers le point
+    hold_note = reconcile_holding(f, d, now)
     p["anchor_dist"] = d
     f["manual_position"] = None
     if track == "air":
-        from lib.engine import compute_position
         f["last_wp_index"] = compute_position(f, now)["wp_index"]
     await save(f, body.version)
     label = "Position ajustée " + ("en avant" if p["anchor_dist"] >= before else "en arrière")
-    await log_event("position", label, user, f, f"{'roulage' if track != 'air' else 'route'} : {p['anchor_dist']:.2f} / {total:.2f} NM")
+    await log_event("position", label, user, f, f"{'roulage' if track != 'air' else 'route'} : {p['anchor_dist']:.2f} / {total:.2f} NM"
+                    + (f" — {hold_note}" if hold_note else ""))
     return detail(f, user, now, ctx)
 
 
@@ -463,6 +478,23 @@ async def set_gates(flight_id: str, body: GatesIn, user: dict = Depends(require(
             raise HTTPException(403, f"{f['arrival']} ne relève d'aucune de vos positions : poste en lecture seule.")
         f["arr_gate"] = gate_ref(await get_graph(f["arrival"]), body.arr_gate)
         f["arr_gate_by"] = "pilote" if user["role"] == "pilote" else "atc"
+        if f.get("taxi_in"):  # the drawn route ended at the old stand
+            now = utcnow()
+            rebase(f, now)
+            origin = taxi_origin(f, "taxi_in", now)
+            try:
+                t = await build_taxi_path(f["arrival"], [] if origin else f["taxi_in"].get("points") or [], None, body.arr_gate, origin=origin) if body.arr_gate else None
+            except HTTPException:
+                t = None
+            on_it = f["progress"].get("track") == "taxi_in"
+            f["taxi_in"] = {**f["taxi_in"], **t, "points": [] if origin else f["taxi_in"].get("points") or []} if t else None
+            if on_it:
+                if t:
+                    f["progress"].update(anchor_dist=0.0, anchor_at=now)
+                else:
+                    f["progress"].update(track="air", anchor_dist=track_length(f, "air"), anchor_at=now)
+                    if f["phase"] == "roulage_arrivee":
+                        f["progress"]["hold"] = True
         changes.append(f"arrivée {'assignée' if f['arr_gate_by'] == 'atc' else 'souhaitée'} {body.arr_gate or '—'}")
     if not changes:
         return detail(f, user, utcnow(), ctx)
@@ -473,9 +505,8 @@ async def set_gates(flight_id: str, body: GatesIn, user: dict = Depends(require(
 
 @router.put("/{flight_id}/taxi", response_model=FlightDetail)
 async def set_taxi(flight_id: str, body: TaxiIn, user: dict = Depends(require("flight:taxi"))):
-    """Définit ou MODIFIE le roulage (y compris en cours de mouvement).
-    À l'arrivée, les points cliqués (y compris une sortie derrière l'avion) sont acceptés :
-    le tracé part de la position avion / piste vers la porte."""
+    """Définit ou MODIFIE le roulage, point par point, jusqu'à la destination (point d'attente ou porte), y compris
+    pendant le roulage. Arrivée : la porte d'abord, puis la sortie de piste (même derrière l'avion, qui y est ramené)."""
     f = await load_flight(flight_id)
     check_version(f, body.version)
     if f["phase"] not in ACTIVE:
@@ -487,54 +518,47 @@ async def set_taxi(flight_id: str, body: TaxiIn, user: dict = Depends(require("f
     icao = f["departure"] if out else f["arrival"]
     gate = (f.get("dep_gate") if out else f.get("arr_gate")) or {}
     now = utcnow()
-    # Position actuelle (pour reconnexion live sur le nouveau tracé)
+    ground = await get_ground(icao)
+    if not out and not gate.get("ref") and ground.get("gates"):
+        raise HTTPException(422, "Choisissez d'abord la porte d'arrivée, puis la sortie de piste.")
+    if not all(on_airport(ground, p[0], p[1]) for p in body.points):
+        raise HTTPException(422, f"Point hors de l'aéroport : cliquez sur une voie de {icao}.")
+    hp = f.get("holding_point") if out else None
+    if out and body.holding_ref:
+        hp = next((h for h in ground.get("holdings", []) if (h.get("ref") or "") == body.holding_ref
+                   and abs(h["lat"] - (body.holding_lat or 0)) < 1e-4 and abs(h["lon"] - (body.holding_lon or 0)) < 1e-4), None)
+        if not hp:
+            raise HTTPException(404, "Point d'attente inconnu dans les données de l'aéroport.")
+        hp = {"ref": hp.get("ref"), "lat": hp["lat"], "lon": hp["lon"]}
+    end = (hp["lat"], hp["lon"]) if hp else None
+    origin = taxi_origin(f, body.kind, now)  # pendant le roulage : à partir de l'avion
     was_on_track = f["progress"].get("track") == body.kind
-    prev_pos = compute_position(f, now) if was_on_track else None
-
-    origin, orient = arrival_taxi_origin(f, now) if not out else (None, None)
-    # Arrivée : toujours accepter les points dans l'ordre cliqué ; orient_from peut réordonner
-    # vers la porte, y compris si la sortie est derrière l'avion.
-    t = await build_taxi_path(
-        icao,
-        body.points,
-        gate.get("ref") if out else None,
-        None if out else gate.get("ref"),
-        origin=origin,
-        orient_from=orient,
-    )
+    try:
+        t = await build_taxi_path(icao, body.points, gate.get("ref") if out and not origin else None,
+                                  None if out else gate.get("ref"), origin=origin, end_point=end)
+    except HTTPException as e:
+        raise HTTPException(422, e.detail)
     rebase(f, now)
-    f[body.kind] = {**t, "points": body.points, "set_by_name": user["display_name"], "set_at": now}
-    if out:
+    points = [*body.points, [hp["lat"], hp["lon"]]] if hp else body.points
+    f[body.kind] = {**t, "points": points, "set_by_name": user["display_name"], "set_at": now, "live": bool(origin)}
+    if out and hp:
+        f["holding_point"] = hp
+    if origin:
+        f["progress"].update(track=body.kind, anchor_dist=0.0, anchor_at=now)
+        if f["phase"] == "point_attente":  # nouveau point d'attente au dernier moment : l'avion s'y rend
+            f["phase"] = "roulage"
+            f["progress"]["hold"] = False
+    elif out:
         await align_taxi_out(f)
         t = f["taxi_out"]
-
-    if was_on_track and prev_pos and len(t.get("path") or []) >= 2:
-        # Modification live : projeter l'avion sur le nouveau tracé
-        from lib.geo import cumulative, project
-        pts = [(p[0], p[1]) for p in t["path"]]
-        cum = cumulative(pts)
-        d = project(pts, cum, prev_pos["lat"], prev_pos["lon"])
-        prev_d = float(prev_pos.get("distance_nm") or 0.0)
-        # Sortie / point déjà dépassé : ramener l'avion à ce point et figer jusqu'à reprise du roulage
-        if d + 0.02 < prev_d:
-            f["progress"].update(track=body.kind, anchor_dist=d, anchor_at=now, hold=True)
-        else:
-            f["progress"].update(track=body.kind, anchor_dist=d, anchor_at=now, hold=False)
-    elif f["progress"].get("track") == body.kind:
-        f["progress"]["anchor_dist"] = 0.0 if f["phase"] in ("roulage", "roulage_arrivee", "atterrissage") else track_length(f, body.kind)
-    if not out and f["phase"] == "atterrissage":
-        # Après atterrissage : positionné au début du tracé (sortie), figé jusqu'au début du roulage
-        f["progress"].update(track="taxi_in", anchor_dist=0.0, hold=True)
-
+    elif f["phase"] == "atterrissage":
+        # l'avion est ramené sur la sortie choisie (même déjà dépassée) et figé jusqu'au début du roulage
+        f["progress"].update(track="taxi_in", anchor_dist=0.0, anchor_at=now, hold=True)
+        f["manual_position"] = None
     await save(f, body.version)
     what = "départ" if out else "arrivée"
-    await log_event(
-        "roulage",
-        f"Itinéraire de roulage ({what}) {'modifié' if was_on_track else 'défini'} par le contrôle",
-        user,
-        f,
-        " → ".join(t["names"]) + f" ({t['length_nm']:.2f} NM)",
-    )
+    await log_event("roulage", f"Itinéraire de roulage ({what}) {'modifié' if was_on_track else 'défini'}", user, f,
+                    " → ".join(t["names"]) + f" ({t['length_nm']:.2f} NM)")
     return detail(f, user, now, ctx)
 
 
@@ -689,15 +713,15 @@ async def set_holding(flight_id: str, body: HoldingIn, user: dict = Depends(requ
         raise HTTPException(404, "Point d'attente inconnu dans les données de l'aéroport.")
     gate = (f.get("dep_gate") or {}).get("ref")
     try:
-        t = await build_taxi_path(f["departure"], [[hp["lat"], hp["lon"]]], gate, None)
+        t = await build_taxi_path(f["departure"], [], gate, None, end_point=(hp["lat"], hp["lon"]))
     except HTTPException as e:
         raise HTTPException(422, f"Chemin de roulage automatique indisponible ({e.detail}). Choisissez un autre "
                                  "point d'attente ou demandez un tracé manuel à l'ATC.")
     rebase(f, now)
     f["taxi_out"] = {**t, "points": [[hp["lat"], hp["lon"]]], "set_by_name": user["display_name"], "set_at": now}
+    f["holding_point"] = {"ref": hp.get("ref"), "lat": hp["lat"], "lon": hp["lon"]}
     await align_taxi_out(f)  # holding point chosen during the pushback: from where the tug leaves the aircraft
     t = f["taxi_out"]
-    f["holding_point"] = {"ref": hp.get("ref"), "lat": hp["lat"], "lon": hp["lon"]}
     await save(f, body.version)
     await log_event("roulage", f"Point d'attente {hp.get('ref')} choisi, roulage généré automatiquement", user, f,
                     " → ".join(t["names"]) + f" ({t['length_nm']:.2f} NM)")

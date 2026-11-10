@@ -7,6 +7,7 @@ even if this loop is late or the server restarts — the tick only adds history 
 import asyncio
 import logging
 import os
+from datetime import timedelta
 
 from lib import handover
 from lib.control import record_controllers
@@ -17,10 +18,14 @@ from lib.events import log_event
 logger = logging.getLogger(__name__)
 
 
-async def _auto(f: dict, to: str, label: str, now, extra: str = "") -> None:
-    """Automatic phase change, written only if nobody changed the flight meanwhile (version check)."""
+async def _auto(f: dict, to: str, label: str, now, extra: str = "", started_at=None) -> None:
+    """Automatic phase change, written only if nobody changed the flight meanwhile (version check).
+    `started_at`: the movement really began at that moment (the aircraft loses no time waiting for this tick)."""
     v, before = f["version"], f["phase"]
     enter_phase(f, to, now)
+    if started_at:
+        f["progress"]["anchor_at"] = started_at
+        f["takeoff_at"] = started_at
     f["version"], f["updated_at"] = v + 1, now
     res = await db.flights.replace_one({"id": f["id"], "version": v}, f)
     if res.matched_count:
@@ -64,6 +69,12 @@ async def tick_once() -> None:
     async for f in db.flights.find({"phase": {"$in": moving}}, {"_id": 0}):
         if f.get("holding"):
             await _holding_tick(f, now)
+        if f["phase"] == "alignement" and f.get("takeoff_cleared"):
+            since = lined_up_since(f, now)
+            if since is not None and since >= LINEUP_HOLD_S:
+                await _auto(f, "decollage", "Aligné, début du roulement au décollage (automatique)", now,
+                            started_at=now - timedelta(seconds=since))
+            continue
         pos = compute_position(f, now)
         if pos["track"] == "air":
             last = int(f.get("last_wp_index", 0))
@@ -81,10 +92,6 @@ async def tick_once() -> None:
                 target, _ = approach_target(f)
                 if 0 < target <= pos["distance_nm"]:
                     await _auto(f, "approche", "Entrée en approche (automatique)", now)
-        elif f["phase"] == "alignement" and f.get("takeoff_cleared"):
-            since = lined_up_since(f, now)
-            if since is not None and since >= LINEUP_HOLD_S:
-                await _auto(f, "decollage", "Aligné, début du roulement au décollage (automatique)", now)
         elif f["phase"] == "roulage" and pos["track"] == "taxi_out" and _arrived(pos):
             await _auto(f, "point_attente", "Arrivé au point d'attente (automatique)", now)
         elif f["phase"] == "roulage_arrivee" and pos["track"] == "taxi_in" and _arrived(pos):

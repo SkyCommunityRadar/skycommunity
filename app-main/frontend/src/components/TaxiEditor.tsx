@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { apiPost, apiPut } from "@/lib/api";
 import { errMsg, useFlightMutation } from "@/lib/hooks";
 import type { FlightDetail, TaxiPreview } from "@/lib/types";
+import { isLiveTaxi } from "@/lib/useFlightEditing";
 
 import { tr } from "@/lib/i18n";
 interface Props {
@@ -14,10 +15,12 @@ interface Props {
   onPreview: (path: number[][]) => void;
   onEdit: () => void;
   onDone: () => void;
+  /** departure: the holding point the route ends on */
+  destination?: { ref: string | null; lat: number; lon: number } | null;
 }
 
 /** ATC enters a taxi route by clicking on the taxiways; the server routes it along the real OSM network. */
-export default function TaxiEditor({ flight, kind, editing, points, setPoints, onPreview, onEdit, onDone }: Props) {
+export default function TaxiEditor({ flight, kind, editing, points, setPoints, onPreview, onEdit, onDone, destination }: Props) {
   const m = useFlightMutation(flight.id);
   const current = flight[kind];
   const out = kind === "taxi_out";
@@ -25,10 +28,14 @@ export default function TaxiEditor({ flight, kind, editing, points, setPoints, o
   const gate = out ? flight.dep_gate : flight.arr_gate;
   const [preview, setPreview] = useState<TaxiPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const live = isLiveTaxi(flight, kind);
+  const dest = out && destination ? { holding_lat: destination.lat, holding_lon: destination.lon } : {};
+  const ready = points.length > 0 || (out ? !!destination : live);
 
   useEffect(() => {
-    if (!editing || points.length === 0) {
+    if (!editing || !ready) {
       setPreview(null);
+      setError(null);
       onPreview([]);
       return;
     }
@@ -36,7 +43,7 @@ export default function TaxiEditor({ flight, kind, editing, points, setPoints, o
     const params = new URLSearchParams({ flight_id: flight.id });
     if (gate) params.set(out ? "start_gate" : "end_gate", gate.ref);
     const qs = `?${params}`;
-    apiPost<TaxiPreview>(`/airports/${icao}/taxi-preview${qs}`, { kind, points })
+    apiPost<TaxiPreview>(`/airports/${icao}/taxi-preview${qs}`, { kind, points, ...dest })
       .then((p) => {
         if (!live) return;
         setPreview(p);
@@ -48,11 +55,11 @@ export default function TaxiEditor({ flight, kind, editing, points, setPoints, o
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, points, icao, gate?.ref]);
+  }, [editing, points, icao, gate?.ref, destination?.lat, destination?.lon]);
 
   const save = () =>
     m.mutate(
-      { fn: () => apiPut<FlightDetail>(`/flights/${flight.id}/taxi`, { kind, points, version: flight.version }), success: tr("Roulage enregistré") },
+      { fn: () => apiPut<FlightDetail>(`/flights/${flight.id}/taxi`, { kind, points, version: flight.version, ...(destination ? { holding_ref: destination.ref, holding_lat: destination.lat, holding_lon: destination.lon } : {}) }), success: tr("Roulage enregistré") },
       { onSuccess: onDone },
     );
 
@@ -61,14 +68,17 @@ export default function TaxiEditor({ flight, kind, editing, points, setPoints, o
       {editing ? (
         <div className="space-y-2">
           <p className="text-[#4AA8F0]">
-            {out
-              ? tr("Cliquez sur la carte les voies à emprunter dans l'ordre jusqu'au point d'attente. Le tracé suit automatiquement les taxiways.")
+            {live
+              ? tr("L'avion roule : le nouveau tracé part de sa position. Cliquez les voies à emprunter, point par point, jusqu'à la destination.")
+              : out
+              ? tr("Cliquez sur la carte les voies à emprunter, point par point. Cliquez un cercle orange pour changer de point d'attente. Le tracé suit automatiquement les taxiways.")
               : gate
-                ? tr("Porte {0} enregistrée : cliquez la sortie de piste (même derrière l'avion). Le tracé jusqu'à la porte est calculé automatiquement. Vous pouvez ajouter d'autres points si besoin.", [gate.ref])
-                : tr("Choisissez d'abord la porte d'arrivée, puis cliquez la sortie de piste. Le tracé se calcule automatiquement.")}
+                ? tr("Poste {0} enregistré : cliquez la sortie de piste, même derrière l'avion. Le tracé jusqu'au poste est automatique, ajoutez des points pour le modifier.", [gate.ref])
+                : tr("Choisissez d'abord le poste d'arrivée, puis la sortie de piste.")}
           </p>
+          {out && destination && <p className="text-[11px] text-muted-foreground" data-testid="taxi-destination">{tr("Destination : {0}", [destination.ref ?? "—"])}</p>}
           <p className="font-mono text-[11px]" data-testid={`taxi-${kind}-preview`}>
-            {points.length === 0 ? tr("Aucun point.") : preview ? tr("{0} · {1} NM", [preview.names.join(" → ") || "—", preview.length_nm.toFixed(2)]) : tr("Calcul…")}
+            {!ready ? tr("Aucun point.") : preview ? tr("{0} · {1} NM", [preview.names.join(" → ") || "—", preview.length_nm.toFixed(2)]) : tr("Calcul…")}
           </p>
           {error && <p className="text-red-400" data-testid={`taxi-${kind}-error`}>{error}</p>}
           <div className="flex flex-wrap gap-2">

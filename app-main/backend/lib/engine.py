@@ -5,6 +5,7 @@ and a simulated speed profile. Browsers never advance aircraft; they only read t
 """
 
 import math
+import re
 from datetime import datetime, timezone
 
 from lib.geo import cumulative, interp, locate, project, haversine_nm
@@ -56,7 +57,6 @@ ACTIONS: dict[str, dict] = {
     # from the holding point the aircraft first lines up (shown on the map), then rolls by itself
     "decollage": dict(label="Décollage", frm=["point_attente", "alignement"], to="decollage", roles=P, confirm=True),
     "approche": dict(label="Entrée en approche", frm=["en_route"], to="approche", roles=P),
-    "retour_en_route": dict(label="Retour en route", frm=["approche"], to="en_route", roles=C),
     # take-off abandoned on the runway: back to the holding point to try again, or back to the stand
     "interrompre_decollage": dict(label="Interrompre : retour au point d'attente", frm=["decollage"], to="point_attente",
                                   roles=P, confirm=True),
@@ -66,8 +66,8 @@ ACTIONS: dict[str, dict] = {
     "go_around": dict(label="Remise de gaz", frm=["approche", "atterrissage"], to="approche", roles=P, confirm=True),
     "roulage_arrivee": dict(label="Début du roulage à l'arrivée", frm=["atterrissage"], to="roulage_arrivee", roles=P),
     "parking": dict(label="Arrivée au parking", frm=["roulage_arrivee"], to="parking", roles=P),
-    "terminer": dict(label="Terminer le vol", frm=[p for p in ACTIVE if p != "suspendu"], to="termine", roles=P,
-                     confirm=True),
+    # Le vol se termine au parking : par le pilote, ou par l'ATC quand le vol est contrôlé (ensure_control).
+    "terminer": dict(label="Terminer le vol", frm=["parking"], to="termine", roles=P, confirm=True),
     "suspendre": dict(label="Suspendre le vol", frm=[p for p in ACTIVE if p != "suspendu"], to="suspendu",
                       roles=C, confirm=True),
     "reprendre": dict(label="Reprendre le vol", frm=["suspendu"], to=None, roles=C),
@@ -222,7 +222,19 @@ def set_track(f: dict, track: str | None, dist: float, now: datetime) -> None:
     f["progress"].update(track=track, anchor_dist=dist, anchor_at=now)
 
 
+def _rolling_view(f: dict, now: datetime) -> dict:
+    """Autorisé au décollage et aligné : l'avion roule déjà, sans attendre le prochain passage du moteur (3 s)."""
+    if f.get("phase") != "alignement" or not f.get("takeoff_cleared"):
+        return f
+    since = lined_up_since(f, now)
+    if since is None:
+        return f
+    at = datetime.fromtimestamp(now.timestamp() - since, timezone.utc)
+    return {**f, "phase": "decollage", "progress": {**f["progress"], "track": "air", "anchor_dist": 0.0, "anchor_at": at, "hold": False}}
+
+
 def compute_position(f: dict, now: datetime) -> dict:
+    f = _rolling_view(f, now)
     p = f["progress"]
     track = p.get("track")
     route = f["route"]
@@ -319,57 +331,54 @@ def procedures(route: list[dict]) -> tuple[str | None, str | None, int | None]:
 NOT_FIX = ("TOC", "TOD")
 
 
+def _star_entry(route: list[dict], star: str | None, half: int) -> int | None:
+    """Index du point d'entrée de CETTE STAR sur la route, ou None si la route ne la contient pas.
+    1) le fix qui porte le nom de la STAR (TINI9W commence à TINIL) ;
+    2) sinon le fix d'où part la première branche de la STAR : dans le navlog SimBrief, « via » décrit la branche qui
+       ARRIVE sur un fix, le premier fix marqué du nom de la STAR est donc déjà son 2e point."""
+    n = len(route)
+    if not star:
+        return None
+    usable = lambda i: route[i].get("ident") not in NOT_FIX and route[i].get("kind") not in ("apt", "rwy")
+    prefix = (re.match(r"[A-Z]+", star) or [""])[0]
+    if len(prefix) >= 3:
+        for i in range(half, n - 1):
+            if usable(i) and route[i].get("ident", "").startswith(prefix):
+                return i
+    for i in range(half, n - 1):
+        if (route[i].get("via") or "") == star:
+            j = i - 1
+            while j >= half and not usable(j):
+                j -= 1
+            return j if j >= half else i
+    return None
+
+
 def approach_target(f: dict) -> tuple[float, str]:
-    """Distance le long de la route pour « Entrée en approche ».
-    Priorité stricte : nom STAR du plan (plan_meta), puis premier fix RÉEL de cette STAR
-    dans la 2e moitié de route — jamais un fix SID / 1re moitié.
-    """
+    """Distance le long de la route pour « Entrée en approche ». La STAR est celle AFFICHÉE : celle saisie sur le strip
+    par le contrôle si elle existe, sinon celle du plan. Jamais l'entrée d'une autre STAR."""
     route = f["route"]
     n = len(route)
     meta = f.get("plan_meta") or {}
-    star = meta.get("star")
     _sid, star_from_route, star_idx = procedures(route)
-    if not star:
-        star = star_from_route
+    plan_star = meta.get("star") or star_from_route
+    chosen = (f.get("strip") or {}).get("star")
+    star = chosen or plan_star
     half = max(1, n // 2)
-
-    def first_star_entry() -> int | None:
-        # 1) Chercher explicitement le nom STAR (plan ou route) dans la 2e moitié
-        if star:
-            for i in range(half, n - 1):
-                if route[i].get("ident") in NOT_FIX:
-                    continue
-                via = (route[i].get("via") or "")
-                if via == star:
-                    # début de la séquence : le précédent n'a plus ce via
-                    prev_via = (route[i - 1].get("via") or "") if i > 0 else ""
-                    if prev_via != star:
-                        return i
-            # même STAR marquée sid_star sans via exact
-            for i in range(half, n - 1):
-                if route[i].get("sid_star") and (route[i].get("via") or "") == star and route[i].get("ident") not in NOT_FIX:
-                    return i
-        # 2) index calculé par procedures() (déjà borné à la 2e moitié)
-        if star_idx is not None and half <= star_idx < n - 1:
+    idx = _star_entry(route, star, half)
+    if idx is None and star == plan_star:  # STAR du plan sans nom exploitable : repli sur les marques du navlog
+        if star_idx is not None and half <= star_idx < n - 1 and route[star_idx].get("ident") not in NOT_FIX:
             idx = star_idx
-            while idx < n - 1 and route[idx].get("ident") in NOT_FIX:
-                idx += 1
-            if idx < n - 1 and (not star or (route[idx].get("via") or "") == star or route[idx].get("sid_star")):
-                return idx
-        # 3) repli : premier sid_star en 2e moitié (sans confondre avec un SID)
-        for i in range(half, n - 1):
-            if route[i].get("sid_star") and route[i].get("ident") not in NOT_FIX:
-                return i
-        return None
-
-    idx = first_star_entry()
+        else:
+            idx = next((i for i in range(half, n - 1) if route[i].get("sid_star") and route[i].get("ident") not in NOT_FIX), None)
     if idx is not None:
         label_star = star or (route[idx].get("via") or "STAR")
         return route[idx]["cum_nm"], f"Positionné à l'entrée de la STAR {label_star} ({route[idx]['ident']})"
 
     tod = next((i for i in range(1, n - 1) if route[i].get("ident") == "TOD"), None)
     if tod is not None:
-        return route[tod]["cum_nm"], "Pas de STAR dans le plan : positionné au TOD (début de descente)"
+        why = f"STAR {star} absente de la route" if star else "Pas de STAR dans le plan"
+        return route[tod]["cum_nm"], f"{why} : positionné au TOD (début de descente)"
     total = route[-1]["cum_nm"]
     to_lose = max(0.0, float(route[0].get("alt_ft") or 0) - float(route[-1].get("alt_ft") or 0))
     # 3 NM / 1000 ft
@@ -398,33 +407,42 @@ def pushback_point(f: dict, now: datetime) -> tuple[float, float, float] | None:
     if f["phase"] != "repoussage" or d not in PUSH_VEC:
         return None
     lat, lon = dep_point(f)
-    started = aware(f["progress"].get("anchor_at")) or now
+    # pushback_at et non anchor_at : choisir un point d'attente pendant le repoussage ne doit pas le faire recommencer
+    started = aware(f.get("pushback_at")) or aware(f["progress"].get("anchor_at")) or now
     elapsed = (now - started).total_seconds()
-    initial_hdg = float((f.get("dep_gate") or {}).get("hdg") or PUSH_HDG[d])
     final_hdg = PUSH_HDG[d]
     to = f.get("pushback_to")
+    gate_hdg = (f.get("dep_gate") or {}).get("hdg")
+    if gate_hdg is not None:
+        initial_hdg = float(gate_hdg)
+    elif to:  # poste sans orientation connue : poussé en marche arrière, le nez regarde le poste
+        from lib.runways import bearing
+        initial_hdg = bearing(to["lat"], to["lon"], lat, lon)
+    else:
+        initial_hdg = final_hdg
     if to:
         dist = push_distance_m(f, to["lat"], to["lon"])
         k = 1.0 if dist < 1 else min(1.0, max(0.0, elapsed * PUSH_SPEED / dist))
-        hdg = final_hdg if k >= 0.98 else initial_hdg
+        hdg = final_hdg if k >= 1.0 else initial_hdg  # le nez tourne seulement une fois le point atteint
         return lat + (to["lat"] - lat) * k, lon + (to["lon"] - lon) * k, hdg
     k = min(1.0, max(0.0, elapsed / PUSH_S))
     dy, dx = PUSH_VEC[d]
     dlat = dy * PUSH_M * k / 111_320
     dlon = dx * PUSH_M * k / (111_320 * max(0.2, math.cos(math.radians(lat))))
-    hdg = final_hdg if k >= 0.98 else initial_hdg
+    hdg = final_hdg if k >= 1.0 else initial_hdg
     return lat + dlat, lon + dlon, hdg
 
 
-def arrival_taxi_origin(f: dict, now: datetime) -> tuple[tuple[float, float] | None, tuple[float, float] | None]:
-    """Arrival taxi anchor: (aircraft position to start from, or None ; reference used only to order the points).
-    On the ground after landing the route starts at the aircraft; still airborne, the arrival runway end is used
-    so that the clicked points are always taken from the aircraft side towards the stand."""
-    if f["phase"] in ("atterrissage", "roulage_arrivee") and not f.get("manual_position"):
+LIVE_TAXI = {"taxi_out": ("roulage", "point_attente"), "taxi_in": ("roulage_arrivee",)}
+
+
+def taxi_origin(f: dict, kind: str, now: datetime) -> tuple[float, float] | None:
+    """Modification pendant le roulage : le nouveau tracé part de l'avion. Avant le roulage, None : le départ part du
+    poste, et l'arrivée de la sortie de piste cliquée (même derrière l'avion, qui y est ramené)."""
+    if f["phase"] in LIVE_TAXI[kind] and f["progress"].get("track") == kind:
         pos = compute_position(f, now)
-        return (pos["lat"], pos["lon"]), None
-    end = f["route"][-1]
-    return None, (end["lat"], end["lon"])
+        return pos["lat"], pos["lon"]
+    return None
 
 
 # ---------- transitions ----------
@@ -448,6 +466,8 @@ def enter_phase(f: dict, to: str, now: datetime) -> None:
     track = f["progress"].get("track")
     if to == "preparation":
         f["pushback_to"] = None  # back on the stand: a new pushback will be chosen
+    if to == "repoussage":
+        f["pushback_at"] = now
     if to in ("preparation", "repoussage"):
         # back on the stand (also when going back with « étape précédente »): no taxi / air track any more,
         # otherwise the old taxi position would hide the stand and the pushback would never move
@@ -819,6 +839,40 @@ def end_holding(f: dict, at: datetime) -> None:
     h = f.pop("holding", None)
     if h:
         f["progress"].update(track="air", anchor_dist=h["fix_nm"], anchor_at=at)
+
+
+def reconcile_holding(f: dict, new_dist: float, now: datetime) -> str | None:
+    """L'avion est déplacé à la main le long de la route (±NM, point précédent / suivant, recalage). Le hold reste
+    TOUJOURS sur son point : au-delà du point le hold est terminé, en deçà l'avion revient vers le point et y refera
+    son hold. À appeler AVANT de changer anchor_dist."""
+    h = f.get("holding")
+    if not h or f["progress"].get("track") != "air":
+        return None
+    entered = hold_entered_at(f, now)
+    if new_dist > h["fix_nm"] + 1e-6:
+        if entered:
+            add_hold_time(f, now)
+        f.pop("holding", None)
+        return f"fin du hold sur {h['ident']}"
+    if new_dist < h["fix_nm"] - 1e-6 and entered:
+        add_hold_time(f, now)
+        h.update(entered_at=None, exit=False, turns_done_logged=False)
+        return f"retour vers le hold sur {h['ident']}"
+    return None
+
+
+def go_around(f: dict, now: datetime) -> None:
+    """Remise de gaz : l'avion repart à l'entrée de l'approche pour une nouvelle tentative (depuis l'approche comme
+    depuis l'atterrissage). Le hold éventuel est terminé."""
+    if f.get("holding"):
+        add_hold_time(f, now)
+        f.pop("holding", None)
+    target, note = approach_target(f)
+    f["manual_position"] = None
+    f["progress"]["hold"] = False
+    set_track(f, "air", target, now)
+    f["last_wp_index"] = compute_position(f, now)["wp_index"]
+    f["approach_note"] = f"Remise de gaz — {note}"
 
 
 REJECT_ACTIONS = ("interrompre_decollage", "retour_parking")

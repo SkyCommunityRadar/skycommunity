@@ -23,7 +23,7 @@ import { tr, trServer } from "@/lib/i18n";
 type Tab = "details" | "taxi" | "route" | "history";
 
 // codes of the « fin ou interruption du vol » actions (same list as FlightActions' DANGER)
-const END_CODES = new Set(["terminer", "annuler", "suspendre"]);
+const END_CODES = new Set(["annuler", "suspendre"]);
 
 function Card({ icon: Icon, title, children, testId }: { icon: typeof Gauge; title: string; children: React.ReactNode; testId: string }) {
   return (
@@ -127,6 +127,14 @@ export default function FlightPanel({
                   <b>{tr("Avant de rouler :")}</b>{" "}{tr("choisissez votre point d'attente à {0}. Le chemin de roulage depuis votre poste sera tracé automatiquement.", [f.departure])}</span>
                 <Button size="sm" onClick={() => { setTab("taxi"); if (ed.mode !== "holding") ed.togglePickHolding(); }} data-testid="holding-reminder-pick">
                   <MapPin className="h-3.5 w-3.5" />{" "}{tr("Choisir sur la carte")}</Button>
+              </div>
+            )}
+            {f.can_edit_taxi_in && !f.taxi_in && ["en_route", "approche", "atterrissage"].includes(f.phase) && ed.mode !== "taxi_in" && ed.mode !== "gate_arr" && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs" data-testid="arrival-taxi-reminder">
+                <span className="min-w-0 flex-1 text-amber-100">
+                  <b>{tr("Roulage à l'arrivée :")}</b>{" "}{f.arr_gate ? tr("choisissez la sortie de piste à {0}, le tracé jusqu'au poste {1} sera automatique.", [f.arrival, f.arr_gate.ref]) : tr("choisissez d'abord votre poste à {0}, puis la sortie de piste.", [f.arrival])}</span>
+                <Button size="sm" onClick={() => { setTab("taxi"); if (f.arr_gate) ed.startEdit("taxi_in"); else ed.startGatePick("arr"); }} data-testid="arrival-taxi-open">
+                  <MapPin className="h-3.5 w-3.5" />{" "}{tr("Ouvrir le roulage")}</Button>
               </div>
             )}
             <Card icon={Gauge} title={tr("Phase du vol")} testId="card-phase">

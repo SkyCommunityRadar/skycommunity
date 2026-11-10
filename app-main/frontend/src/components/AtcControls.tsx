@@ -4,7 +4,7 @@ import { useFlightMutation } from "@/lib/hooks";
 import type { ControlIn, FlightDetail } from "@/lib/types";
 
 import { tr } from "@/lib/i18n";
-export type MapMode = "view" | "snap" | "free" | "taxi_out" | "taxi_in" | "holding" | "pushback" | "pick";
+export type MapMode = "view" | "snap" | "free" | "taxi_out" | "taxi_in" | "holding" | "pushback" | "pick" | "gate_dep" | "gate_arr";
 
 /** Controller tools (ATC/Admin only — enforced server-side too). */
 export default function AtcControls({

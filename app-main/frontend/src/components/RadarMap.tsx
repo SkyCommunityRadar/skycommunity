@@ -432,6 +432,7 @@ export default function RadarMap(p: Props) {
         const mk = L.circleMarker([gt.lat, gt.lon], {
           radius: on ? 6 : 3, color: on ? "#4AA8F0" : "#E5E7EB", weight: on ? 2 : 0,
           fillColor: on ? "#4AA8F0" : "#E5E7EB", fillOpacity: on ? 0.85 : 0.01, bubblingMouseEvents: false,
+          interactive: !!p.onGateClick, // otherwise a stand would swallow the clicks meant for the map
         })
           .bindTooltip(esc(gt.ref), { permanent: true, direction: "center", className: on ? "stand-label stand-on" : "stand-label" })
           .addTo(g);
@@ -469,7 +470,7 @@ export default function RadarMap(p: Props) {
     syncRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     declutterRef.current();
-  }, [groundSig(p.grounds), sig(p.highlightGates), sig(p.draftPoints), !!p.onHoldingClick, !!p.onTaxiwayClick, p.selectedHolding?.lat, p.selectedHolding?.lon]);
+  }, [groundSig(p.grounds), sig(p.highlightGates), sig(p.draftPoints), !!p.onHoldingClick, !!p.onTaxiwayClick, !!p.onGateClick, p.selectedHolding?.lat, p.selectedHolding?.lon]);
 
   // airspaces (VATSIM community data) + open SkyCommunity ATC positions
   useEffect(() => {
@@ -589,15 +590,10 @@ export default function RadarMap(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig(p.taxis)]);
 
-  // Flèche de sens du nez pendant le choix / le repoussage
+  // Flèche temporaire : sens vers lequel le nez va pointer, À CÔTÉ de l'avion (visible à tous les zooms)
   useEffect(() => {
-    const g = layers.current.graph;
+    const g = layers.current.flights;
     if (!g || !map.current) return;
-    const prev = (map.current as unknown as { _pushArrow?: L.Marker })._pushArrow;
-    if (prev) {
-      try { g.removeLayer(prev); } catch { /* */ }
-      (map.current as unknown as { _pushArrow?: L.Marker })._pushArrow = undefined;
-    }
     const h = p.pushHint;
     if (!h) return;
     const mk = L.marker([h.lat, h.lon], {
@@ -606,10 +602,9 @@ export default function RadarMap(p: Props) {
         className: "push-arrow",
         html: `<div style="transform:rotate(${h.hdg}deg);font-size:28px;line-height:1;filter:drop-shadow(0 0 3px #000)" title="${esc(h.label || "Repoussage")}">⬆</div>`,
         iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        iconAnchor: [-24, 14], // 24 px à droite du symbole de l'avion, quel que soit le zoom
       }),
     }).addTo(g);
-    (map.current as unknown as { _pushArrow?: L.Marker })._pushArrow = mk;
     return () => {
       try { g.removeLayer(mk); } catch { /* */ }
     };

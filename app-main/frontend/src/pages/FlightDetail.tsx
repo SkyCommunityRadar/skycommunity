@@ -19,7 +19,7 @@ function DetailView({ id }: { id: string; user: User }) {
   const f = q.data;
   const ed = useFlightEditing(f, dep.data, params.get("pick") === "holding" ? "holding" : "view", () => {
     if (params.has("pick")) setParams({}, { replace: true });
-  });
+  }, arr.data);
 
   if (!f) {
     return (
@@ -49,7 +49,7 @@ function DetailView({ id }: { id: string; user: User }) {
           selectedId={f.id}
           route={f.route}
           flownIndex={f.position.track === "air" ? f.position.wp_index : undefined}
-          aircraftPos={f.position.track === "air" ? [f.position.lat, f.position.lon] : undefined}
+          aircraftPos={f.position.track === "air" ? (f.holding?.entered ? (f.holding.path[0] as [number, number]) : [f.position.lat, f.position.lon]) : undefined}
           holdPath={f.holding?.path}
           lineupPath={f.lineup ?? undefined}
           taxis={ed.taxis}
@@ -60,9 +60,9 @@ function DetailView({ id }: { id: string; user: User }) {
           onHoldingClick={ed.onHoldingClick}
           onTaxiwayClick={ed.onTaxiwayClick}
           onGateClick={ed.onGateClick}
-          pickPoints={ed.pick?.points.map((x) => ({ ...x, selected: x.id === ed.pick?.selected }))}
-          onPickPoint={(id) => ed.setPicked(id)}
-          selectedHolding={f.holding_point}
+          pickPoints={ed.pickPoints}
+          onPickPoint={ed.onPickPoint}
+          selectedHolding={ed.editingKind === "taxi_out" ? ed.destination : f.holding_point}
           crosshair={ed.crosshair}
           pushHint={ed.pushHint}
           center={ed.focusAt ?? [f.position.lat, f.position.lon]}

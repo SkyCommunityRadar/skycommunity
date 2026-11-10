@@ -3,10 +3,11 @@ import LangSwitch from "@/components/LangSwitch";
 import InstallApp from "@/components/InstallApp";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { FileText, Plane, RadioTower } from "lucide-react";
+import { FileText, Heart, Plane, RadioTower } from "lucide-react";
 import { DiscordIcon } from "@/components/AppShell";
 import { apiGet } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
+import { DONATE_URL } from "@/lib/siteConfig";
 
 import { labels, tr } from "@/lib/i18n";
 const D_ERR: Record<string, string> = labels({
@@ -93,6 +94,16 @@ export default function Login() {
             data-testid="discord-button"
           >{tr("Pas encore membre ? Rejoindre le Discord SkyCommunity")}</a>
         </div>
+
+        <a
+          href={DONATE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-600/30 transition-[transform,filter] duration-150 hover:-translate-y-0.5 hover:brightness-110"
+          data-testid="donate-home-button"
+        >
+          <Heart className="h-4 w-4 fill-white/90" />{" "}{tr("Soutenir le projet")}
+        </a>
 
         <div className="mt-10 grid w-full gap-3 sm:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, text }, i) => (

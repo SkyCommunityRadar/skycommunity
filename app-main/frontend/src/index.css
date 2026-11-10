@@ -104,9 +104,7 @@
 .leaflet-container { background: #161B26 !important; font-family: var(--font-mono); }
 /* Pendant saisie roulage / pushback : rester en « + », jamais en main Leaflet */
 .leaflet-container.cursor-crosshair,
-.leaflet-container.cursor-crosshair .leaflet-interactive,
-.leaflet-container.cursor-crosshair .leaflet-grab,
-.leaflet-container.cursor-crosshair .leaflet-dragging {
+.leaflet-container.cursor-crosshair * {
   cursor: crosshair !important;
 }
 .leaflet-control-attribution { background: rgba(11, 17, 30, 0.85) !important; color: #64748B !important; font-size: 10px; }

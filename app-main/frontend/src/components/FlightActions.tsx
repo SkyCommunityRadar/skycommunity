@@ -28,11 +28,11 @@ const DIRS = [
 ] as const;
 const ICONS: Record<string, LucideIcon> = {
   repoussage: MoveDown, roulage: Route, point_attente: Hand, alignement: MoveRight, decollage: PlaneTakeoff, approche: Navigation,
-  retour_en_route: Undo2, go_around: Undo2, atterrissage: PlaneLanding, roulage_arrivee: Route, parking: SquareParking, reprendre: Play,
+  go_around: Undo2, atterrissage: PlaneLanding, roulage_arrivee: Route, parking: SquareParking, reprendre: Play,
   suspendre: Pause, terminer: Flag, annuler: CircleX, interrompre_decollage: Undo2, retour_parking: SquareParking,
 };
 // actions that end or interrupt the flight: kept apart, in red, never next to the normal progression
-const DANGER = new Set(["annuler", "terminer", "suspendre"]);
+const DANGER = new Set(["annuler", "suspendre"]);
 
 type Pending = { label: string; danger: boolean; run: () => void };
 

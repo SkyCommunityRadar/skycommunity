@@ -129,7 +129,9 @@ class GroundSummary(BaseModel):
 
 class TaxiPreviewIn(BaseModel):
     kind: Literal["taxi_out", "taxi_in"]
-    points: list[list[float]] = Field(min_length=1, max_length=30)
+    points: list[list[float]] = Field(default_factory=list, max_length=30)
+    holding_lat: float | None = Field(default=None, ge=-90, le=90)  # destination of a departure taxi
+    holding_lon: float | None = Field(default=None, ge=-180, le=180)
 
 
 class TaxiPreview(BaseModel):
@@ -329,8 +331,12 @@ class ControlIn(BaseModel):
 
 class TaxiIn(BaseModel):
     kind: Literal["taxi_out", "taxi_in"]
-    points: list[list[float]] = Field(min_length=1, max_length=30)
+    points: list[list[float]] = Field(default_factory=list, max_length=30)
     version: int
+    # destination of a departure taxi, clicked on the map (omitted: the holding point already chosen)
+    holding_ref: str | None = Field(default=None, max_length=30)
+    holding_lat: float | None = Field(default=None, ge=-90, le=90)
+    holding_lon: float | None = Field(default=None, ge=-180, le=180)
 
 
 class HoldingIn(BaseModel):

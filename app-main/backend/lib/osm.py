@@ -93,6 +93,31 @@ def _name(tags: dict) -> str:
     return re.sub(r"\s*\(\d+\)\s*$", "", raw).strip()
 
 
+_PAREN_N = re.compile(r"\s*\(\d+\)\s*$")
+_RWY_PART = re.compile(r"^(?:RWY\s*)?(?:\d{2}[LRC]?|[A-Z]\d{2}[LRC])$")  # 28L, W28L, RWY 09 : un morceau de nom qui désigne une piste
+
+
+def clean_ground_name(raw: str | None) -> str:
+    """Nom affiché d'un taxiway / point d'attente : « T (2) » et « W28L/ T » deviennent « T ».
+    Un nom fait uniquement de pistes (« 06L/24R ») est gardé, c'est le nom réel d'un point d'attente."""
+    name = _PAREN_N.sub("", (raw or "").strip()).strip()
+    name = re.sub(r"^(Taxiway|Taxilane|TWY)\s+", "", name, flags=re.I).strip()
+    if "/" in name:
+        parts = [_PAREN_N.sub("", x).strip() for x in name.split("/")]
+        kept = [x for x in parts if x and not _RWY_PART.match(x.upper())]
+        if kept and len(kept) < len(parts):
+            name = "/".join(kept)
+    return name
+
+
+def _clean_doc(doc: dict) -> dict:
+    """Appliqué à la lecture : les aéroports déjà en cache sont corrigés sans nouveau téléchargement."""
+    lines = [l if l.get("kind") == "runway" else {**l, "name": clean_ground_name(l.get("name"))} for l in doc.get("lines", [])]
+    edges = [e if e[3] == "runway" else [e[0], e[1], clean_ground_name(e[2]), e[3]] for e in doc.get("edges", [])]
+    holds = [{**h, "ref": clean_ground_name(h.get("ref"))} for h in doc.get("holdings", [])]
+    return {**doc, "lines": lines, "edges": edges, "holdings": holds}
+
+
 def _bearing(a: tuple[float, float], b: tuple[float, float]) -> float:
     p1, p2, dl = math.radians(a[0]), math.radians(b[0]), math.radians(b[1] - a[1])
     y = math.sin(dl) * math.cos(p2)
@@ -338,7 +363,7 @@ def name_holdings(icao: str, doc: dict) -> dict:
 
 
 async def get_ground(icao: str, refresh: bool = False, user: dict | None = None) -> dict:
-    return name_holdings(icao.upper(), await _get_ground(icao, refresh, user))
+    return name_holdings(icao.upper(), _clean_doc(await _get_ground(icao, refresh, user)))
 
 
 async def _get_ground(icao: str, refresh: bool = False, user: dict | None = None) -> dict:
@@ -386,19 +411,33 @@ def gate_ref(g: Graph, ref: str | None) -> dict | None:
     return {"ref": ref, "lat": s["lat"], "lon": s["lon"], "hdg": s.get("hdg")}
 
 
+def on_airport(doc: dict, lat: float, lon: float, max_m: float | None = 150.0) -> bool:
+    """Le point est-il sur cet aéroport ? Dans son emprise et, si max_m est donné, à moins de max_m d'une voie."""
+    b = doc.get("bbox")
+    if b and not (b[0] <= lat <= b[2] and b[1] <= lon <= b[3]):
+        return False
+    if max_m is None:
+        return True
+    dlat, dlon = max_m / 110_540, max_m / (111_320 * max(0.2, math.cos(math.radians(lat))))
+    p = _xy(lat, (lat, lon))
+    for line in doc.get("lines", []):
+        for u, v in zip(line["path"], line["path"][1:]):
+            if max(u[0], v[0]) < lat - dlat or min(u[0], v[0]) > lat + dlat or max(u[1], v[1]) < lon - dlon or min(u[1], v[1]) > lon + dlon:
+                continue
+            if _seg_dist(p, _xy(lat, (u[0], u[1])), _xy(lat, (v[0], v[1]))) <= max_m:
+                return True
+    return False
+
+
 async def build_taxi_path(icao: str, points: list[list[float]], start_gate: str | None, end_gate: str | None,
-                          origin: tuple[float, float] | None = None, orient_from: tuple[float, float] | None = None) -> dict:
-    """Route along real taxiways: [start gate | aircraft] -> clicked points (snapped) -> [end gate].
-    `origin` (arrival taxi): the aircraft's position. The route always runs from the aircraft towards the stand,
-    whatever order the points were clicked in, and starts at the aircraft when it is already on the ground.
-    `orient_from` (aircraft still airborne): only used to put the clicked points in the aircraft -> stand order."""
+                          origin: tuple[float, float] | None = None, end_point: tuple[float, float] | None = None) -> dict:
+    """Route along real taxiways, in the order the points were clicked: [start gate | aircraft] -> clicked points
+    (snapped) -> [end gate | exact end point]. `origin`: the aircraft, when the route is changed while it taxies.
+    `end_point`: the holding point itself, which OpenStreetMap does not always draw exactly on the taxiway."""
     g = await get_graph(icao)
     stops: list[int] = []
     head: list[tuple[float, float]] = []
     tail: list[tuple[float, float]] = []
-    ref = origin or orient_from
-    if ref and len(points) >= 2 and haversine_nm(ref[0], ref[1], *points[-1][:2]) < haversine_nm(ref[0], ref[1], *points[0][:2]):
-        points = list(reversed(points))
     if origin:
         head = [(origin[0], origin[1])]
         stops.append(g.nearest(origin[0], origin[1]))
@@ -411,18 +450,26 @@ async def build_taxi_path(icao: str, points: list[list[float]], start_gate: str 
         n = g.nearest(lat, lon)
         if not stops or stops[-1] != n:
             stops.append(n)
+    tail_name = ""
     if end_gate:
         s = g.gates.get(end_gate)
         if s:
-            stops.append(g.gate_node(end_gate))
-            tail = [(s["lat"], s["lon"])]
+            n = g.gate_node(end_gate)
+            if not stops or stops[-1] != n:
+                stops.append(n)
+            tail, tail_name = [(s["lat"], s["lon"])], "Stand"
+    elif end_point:
+        n = g.nearest(end_point[0], end_point[1])
+        if not stops or stops[-1] != n:
+            stops.append(n)
+        tail = [(end_point[0], end_point[1])]
     if len(stops) < 2:
         raise HTTPException(400, "Cliquez au moins un point de destination sur les voies de circulation.")
     seq = [stops[0]]
     for a, b in zip(stops, stops[1:]):
         seq += g.shortest(a, b)[1:]
     pts = head + [g.coords[n] for n in seq] + tail
-    seg = (["Stand" if not origin else ""] if head else []) + [g.edge_name(a, b) for a, b in zip(seq, seq[1:])] + (["Stand"] if tail else [])
+    seg = (["Stand" if not origin else ""] if head else []) + [g.edge_name(a, b) for a, b in zip(seq, seq[1:])] + ([tail_name] if tail else [])
     names: list[str] = []
     for n in seg:
         if n and (not names or names[-1] != n):
@@ -463,13 +510,13 @@ def runway_exits(g: "Graph", rwy: dict, lat: float, lon: float, allow_behind: bo
 
 
 def vacate_path(g: "Graph", icao: str, origin: tuple[float, float], exit_node: int, target_node: int,
-                tail: tuple[float, float] | None = None) -> dict:
+                tail: tuple[float, float] | None = None, tail_name: str = "Stand") -> dict:
     """Aircraft on the runway -> along the runway to the chosen exit -> taxiways -> target node (+ stand point)."""
     o = g.nearest(*origin)
     seq = g.shortest(o, exit_node)
     seq += g.shortest(exit_node, target_node)[1:]
     pts = [origin] + [g.coords[n] for n in seq] + ([tail] if tail else [])
-    seg = [""] + [g.edge_name(a, b) for a, b in zip(seq, seq[1:])] + (["Stand"] if tail else [])
+    seg = [""] + [g.edge_name(a, b) for a, b in zip(seq, seq[1:])] + ([tail_name] if tail else [])
     names: list[str] = []
     for n in seg:
         if n and (not names or names[-1] != n):
