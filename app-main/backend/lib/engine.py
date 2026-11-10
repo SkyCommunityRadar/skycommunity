@@ -411,8 +411,11 @@ def pushback_point(f: dict, now: datetime) -> tuple[float, float, float] | None:
     """Repoussage : déplacement vers le point cliqué. Pendant le mouvement le nez garde le cap
     initial (porte) ; à l'arrivée au point de push, le nez passe au cap choisi."""
     d = f.get("pushback_dir")
-    if f["phase"] != "repoussage" or d not in PUSH_VEC:
+    phase = f.get("prev_phase") if f["phase"] == "suspendu" else f["phase"]
+    if phase != "repoussage" or d not in PUSH_VEC:
         return None
+    if f["phase"] == "suspendu":
+        now = aware(f.get("suspended_at")) or now  # figé pendant la suspension
     lat, lon = dep_point(f)
     # pushback_at et non anchor_at : choisir un point d'attente pendant le repoussage ne doit pas le faire recommencer
     started = aware(f.get("pushback_at")) or aware(f["progress"].get("anchor_at")) or now
@@ -456,8 +459,17 @@ def taxi_origin(f: dict, kind: str, now: datetime) -> tuple[float, float] | None
 
 def enter_phase(f: dict, to: str, now: datetime) -> None:
     rebase(f, now)
+    if f["phase"] == "suspendu" and to == f.get("prev_phase"):
+        # reprise : le vol continue exactement là où il s'était arrêté, sans rejouer le début de sa phase
+        since, push_at = aware(f.get("suspended_at")), aware(f.get("pushback_at"))
+        if since and push_at:
+            f["pushback_at"] = push_at + (now - since)
+        f["phase"] = to
+        f.pop("suspended_at", None)
+        return
     if to == "suspendu":
         f["prev_phase"] = f["phase"]
+        f["suspended_at"] = now
     elif f["phase"] != "suspendu":
         f["manual_position"] = None
     if to != "suspendu" and f["phase"] != "suspendu":
@@ -556,6 +568,8 @@ def allowed_actions(f: dict, role: str, is_owner: bool, controlled: bool = False
             continue
         if code in REJECT_ACTIONS and not reject_window_open(f, utcnow()):
             continue  # the take-off can only be interrupted during its first minute
+        if code == "go_around" and not go_around_possible(f, utcnow()):
+            continue  # only on short final or after touchdown
         out.append(dict(code=code, label=a["label"], confirm=bool(a.get("confirm")),
                         blocked=taxi_block(f, a["to"], controlled) if a["to"] else None))
     return out
@@ -888,18 +902,81 @@ def nudge_in_hold(f: dict, delta_nm: float | None, laps: int, now: datetime) -> 
     return None
 
 
+GA_SPEED_KT = 160.0
+GA_NEAR_NM = 12.0  # the go-around exists on short final and after touchdown, not 60 NM away
+
+
+def go_around_possible(f: dict, now: datetime) -> bool:
+    if f["phase"] == "atterrissage":
+        return True
+    if f["phase"] != "approche":
+        return False
+    pos = compute_position(f, now)
+    return pos["track"] == "air" and pos["total_nm"] - pos["distance_nm"] <= GA_NEAR_NM
+
+
 def go_around(f: dict, now: datetime) -> None:
-    """Remise de gaz : l'avion repart à l'entrée de l'approche pour une nouvelle tentative (depuis l'approche comme
-    depuis l'atterrissage). Le hold éventuel est terminé."""
+    """Remise de gaz : montée dans l'axe de la piste, tour de piste du côté de la piste (gauche, ou droite pour une
+    piste « R »), puis retour en finale 8 NM pour un nouvel atterrissage. La route est complétée à partir de la
+    position de l'avion : il ne saute nulle part."""
+    from lib.runways import offset
+    route = f["route"]
+    rw = route[-1].get("rwy")
+    fin = next((k for k in range(len(route) - 1, 0, -1) if rw and route[k].get("ident") == f"FINAL{rw['ident']}"), None)
     if f.get("holding"):
         add_hold_time(f, now)
         f.pop("holding", None)
-    target, note = approach_target(f)
+    if not rw or fin is None:  # no runway geometry in this plan: back to the start of the approach
+        target, note = approach_target(f)
+        f["manual_position"] = None
+        f["progress"]["hold"] = False
+        set_track(f, "air", target, now)
+        f["last_wp_index"] = compute_position(f, now)["wp_index"]
+        f["approach_note"] = f"Remise de gaz — {note}"
+        return
+    pos = compute_position(f, now)
+    elev = float(route[-1].get("alt_ft") or 0)
+    if pos["track"] == "air" and f["phase"] == "approche":
+        lat, lon, alt, passed = pos["lat"], pos["lon"], float(pos["alt_ft"] or elev), pos["wp_index"]
+    else:  # already on the runway (atterrissage)
+        lat, lon = project_on_runway(rw, pos["lat"], pos["lon"])
+        alt, passed = elev, len(route) - 2
+    passed = min(passed, len(route) - 2)
+    hdg, thr = float(rw["hdg"]), (rw["lat"], rw["lon"])
+    side = hdg + 90 if str(rw["ident"]).upper().endswith("R") else hdg - 90
+    ga_alt = elev + 3000
+    up = offset(*thr, hdg, float(rw.get("length_nm") or 1.5) + 2.0)
+    cross = offset(*up, side, 2.5)
+    downwind = offset(*thr, side, 2.5)
+    base = offset(*offset(*thr, hdg + 180, 8.0), side, 2.5)
+    ga = [dict(ident="PPOS", name="Remise de gaz", lat=lat, lon=lon, alt_ft=alt, ias_kt=None, kind="ppos"),
+          dict(ident="RDG1", name="Montée dans l'axe", lat=up[0], lon=up[1], alt_ft=elev + 1500, ias_kt=None, kind="ga"),
+          dict(ident="RDG2", name="Vent traversier", lat=cross[0], lon=cross[1], alt_ft=ga_alt, ias_kt=None, kind="ga"),
+          dict(ident="RDG3", name="Vent arrière", lat=downwind[0], lon=downwind[1], alt_ft=ga_alt, ias_kt=None, kind="ga"),
+          dict(ident="RDG4", name="Étape de base", lat=base[0], lon=base[1], alt_ft=elev + 2500, ias_kt=None, kind="ga")]
+    new = [dict(w) for w in route[: passed + 1]] + ga + [dict(w) for w in route[fin:]]
+    ga_first, ga_last = passed + 1, passed + len(ga)  # first PPOS, last RDG4 (indices in `new`)
+    cum_nm, cum_s = float(new[0].get("cum_nm") or 0), float(new[0].get("cum_s") or 0)
+    for i in range(1, len(new)):
+        a, b = new[i - 1], new[i]
+        leg = haversine_nm(a["lat"], a["lon"], b["lat"], b["lon"])
+        if i <= passed:
+            dur = route[i]["cum_s"] - route[i - 1]["cum_s"]
+        elif i > ga_last + 1:  # untouched end of the route (final -> runway): its own timing
+            j = fin + (i - ga_last - 1)
+            dur = route[j]["cum_s"] - route[j - 1]["cum_s"]
+        else:
+            dur = leg / GA_SPEED_KT * 3600
+        cum_nm += leg
+        cum_s += max(1.0, dur)
+        b["cum_nm"], b["cum_s"] = round(cum_nm, 3), round(cum_s, 1)
+    f["route"] = new
     f["manual_position"] = None
     f["progress"]["hold"] = False
-    set_track(f, "air", target, now)
-    f["last_wp_index"] = compute_position(f, now)["wp_index"]
-    f["approach_note"] = f"Remise de gaz — {note}"
+    set_track(f, "air", new[ga_first]["cum_nm"], now)
+    f["last_wp_index"] = ga_first
+    f["approach_note"] = (f"Remise de gaz : montée dans l'axe de la {rw['ident']}, tour de piste à "
+                          f"{'droite' if side > hdg else 'gauche'}, retour en finale 8 NM pour un nouvel atterrissage")
 
 
 REJECT_ACTIONS = ("interrompre_decollage", "retour_parking")

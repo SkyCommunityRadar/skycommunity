@@ -269,6 +269,7 @@ export interface FlightDetail extends FlightSummary {
   plan_meta: Record<string, string | number | null>;
   taxi_out: TaxiRoute | null;
   taxi_in: TaxiRoute | null;
+  taxi_back?: TaxiRoute | null;
   allowed_actions: ActionInfo[];
   /** phase the « previous / next step » buttons lead to (null: no button) */
   step_prev?: string | null;

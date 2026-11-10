@@ -1,6 +1,8 @@
 // English translation of the interface — downloaded only by someone who picks English (lib/i18n.ts).
 // Key = the French text written in the code. Generated from the code, then checked by hand.
 export const EN: Record<string, string> = {
+  "Commencer le roulage": "Start taxiing",
+  "Avion arrêté sur le taxiway de sortie : il part quand vous commencez le roulage.": "Aircraft stopped on the exit taxiway: it moves when you start taxiing.",
   "Cliquez le taxiway de sortie de piste": "Click the runway exit taxiway",
   "Cliquez les voies suivantes, jusqu'à la destination": "Click the next taxiways, up to the destination",
   "à {0}, cliquez le taxiway de sortie, puis les voies suivantes jusqu'à la porte.": "at {0}, click the exit taxiway, then the next taxiways up to the stand.",

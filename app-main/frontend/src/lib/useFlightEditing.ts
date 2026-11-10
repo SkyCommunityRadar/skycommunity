@@ -95,6 +95,7 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
   const taxis: MapTaxi[] = [];
   if (f?.taxi_out && editingKind !== "taxi_out" && !rejecting) taxis.push({ path: f.taxi_out.path, status: "valide" });
   if (f?.taxi_in && editingKind !== "taxi_in") taxis.push({ path: f.taxi_in.path, status: "valide" });
+  if (f?.taxi_back) taxis.push({ path: f.taxi_back.path, status: "valide" });
   if (drawing && draftPath.length > 1) taxis.push({ path: draftPath, status: "brouillon" });
 
   const gateOf = editingKind === "taxi_out" ? f?.dep_gate : null;

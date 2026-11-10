@@ -44,6 +44,14 @@ def _private(addr: str) -> bool:
     return ip.is_loopback or any(ip in n for n in _PRIVATE_NETS)
 
 
+def is_local_ip(addr: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return ip.is_loopback or bool(getattr(ip, "ipv4_mapped", None) and ip.ipv4_mapped.is_loopback)
+
+
 def client_ip(request: Request) -> str:
     """Real client address. When the request comes through the host's reverse proxy (the direct peer is a local /
     private address, or TRUST_PROXY=true), the proxy appends the client to X-Forwarded-For: the right-most entry is
@@ -75,7 +83,7 @@ def check_rate(request: Request) -> tuple[str, int] | None:
         return None
     is_write = method in ("POST", "PUT", "PATCH", "DELETE")
     ip, now = client_ip(request), time.monotonic()
-    if ip in ("127.0.0.1", "::1") and os.environ.get("ALLOW_TEST_LOGIN", "false").lower() == "true":
+    if is_local_ip(ip) and os.environ.get("ALLOW_TEST_LOGIN", "false").lower() == "true":
         return None  # local automated tests only (they fire hundreds of requests from this machine)
     _sweep(now)
     matching = [r for r in RULES if (r[1] is None or (r[1] == "write" and is_write) or r[1] == method) and r[2](path)]

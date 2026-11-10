@@ -95,6 +95,7 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
   const progress = flight.allowed_actions.filter((a) => !DANGER.has(a.code));
   const uniqProgress = progress.filter((a, i, arr) => arr.findIndex((x) => x.code === a.code) === i);
   const danger = flight.allowed_actions.filter((a) => DANGER.has(a.code));
+  const notStarted = flight.position.distance_nm === 0; // waiting at the start of its route (exit after an interrupted take-off)
 
   const action = (code: string, label: string, extra: Record<string, string> = {}) => () =>
     m.mutate({ fn: () => apiPost<FlightDetail>(`/flights/${flight.id}/actions`, { action: code, version: flight.version, ...extra }), success: label });
@@ -259,11 +260,13 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
                 data-testid={flight.hold ? "taxi-resume" : "taxi-stop"}
               >
                 {flight.hold ? <Play className="h-5 w-5" /> : <Hand className="h-5 w-5" />}
-                {flight.hold ? tr("Reprendre le roulage") : tr("Stop — arrêter l'avion")}
+                {flight.hold ? (notStarted ? tr("Commencer le roulage") : tr("Reprendre le roulage")) : tr("Stop — arrêter l'avion")}
               </motion.button>
             )}
             {flight.can_stop_taxi && flight.hold && (
-              <p className="text-center text-xs text-amber-200" data-testid="taxi-stopped-note">{tr("Avion arrêté sur le taxiway — il repart là où il s'est arrêté.")}</p>
+              <p className="text-center text-xs text-amber-200" data-testid="taxi-stopped-note">
+                {notStarted ? tr("Avion arrêté sur le taxiway de sortie : il part quand vous commencez le roulage.") : tr("Avion arrêté sur le taxiway — il repart là où il s'est arrêté.")}
+              </p>
             )}
             {flight.phase === "decollage" && progress.some((a) => a.code === "interrompre_decollage") && (
               <p className="text-xs text-muted-foreground" data-testid="rejected-takeoff-note">{tr("Décollage interrompu ? Choisissez de revenir au point d'attente pour redécoller, ou de rentrer au parking.")}</p>

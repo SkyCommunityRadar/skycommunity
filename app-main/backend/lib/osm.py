@@ -309,7 +309,7 @@ class _Stops:
     Snapping a click to the nearest intersection made the route enter a side branch and come back: the « triangles »."""
 
     def __init__(self, g: Graph):
-        self.g, self.coords, self.links, self.on_edge = g, {}, {}, {}
+        self.g, self.coords, self.links, self.on_edge, self.kinds = g, {}, {}, {}, {}
 
     def stop(self, lat: float, lon: float) -> int:
         a, b, name, kind, t, plat, plon = self.g.snap(lat, lon)
@@ -324,12 +324,49 @@ class _Stops:
         self.links[node] = [(a, da * k, name), (b, db * k, name)]
         self.links.setdefault(a, []).append((node, da * k, name))
         self.links.setdefault(b, []).append((node, db * k, name))
+        for x in (a, b):
+            self.kinds[(node, x)] = self.kinds[(x, node)] = kind
         for other in self.on_edge.get((min(a, b), max(a, b)), []):
             w = haversine_nm(plat, plon, *self.coords[other]) * k
             self.links[node].append((other, w, name))
             self.links[other].append((node, w, name))
+            self.kinds[(node, other)] = self.kinds[(other, node)] = kind
         self.on_edge.setdefault((min(a, b), max(a, b)), []).append(node)
         return node
+
+    def kind(self, a: int, b: int) -> str | None:
+        return self.g.kind.get((a, b)) or self.kinds.get((a, b))
+
+    def from_runway(self, start: int, rwy: dict | None) -> list[int] | None:
+        """Way from the runway to the exit point that was clicked: [junction on the runway centreline, …, point],
+        along taxiways only. The aircraft leaves the runway there and goes on in that direction: it never comes back
+        down the exit taxiway towards the runway (the shortest route used to do exactly that)."""
+        from lib.runways import project_on_runway
+
+        def on_runway(n: int) -> bool:
+            if n < 0 or not any(self.g.kind.get((n, v)) == "runway" for v, _, _ in self.g.adj.get(n, [])):
+                return False
+            return rwy is None or haversine_nm(*self.g.coords[n], *project_on_runway(rwy, *self.g.coords[n])) < 0.05
+
+        if start < 0 and any(self.kinds.get((start, v)) == "runway" for v, _, _ in self.links.get(start, [])):
+            return [start]  # clicked on the runway itself
+        dist, prev, pq = {start: 0.0}, {}, [(0.0, start)]
+        while pq:
+            d, u = heapq.heappop(pq)
+            if d > dist.get(u, math.inf) or d > 1.5:
+                continue
+            if on_runway(u):
+                out = [u]
+                while out[-1] != start:
+                    out.append(prev[out[-1]])
+                return out  # junction first, clicked point last
+            for v, w, _ in self.g.adj.get(u, []) + self.links.get(u, []):
+                if self.kind(u, v) == "runway":
+                    continue
+                if d + w < dist.get(v, math.inf):
+                    dist[v], prev[v] = d + w, u
+                    heapq.heappush(pq, (d + w, v))
+        return None
 
     def at(self, n: int) -> tuple[float, float]:
         return self.coords[n] if n < 0 else self.g.coords[n]
@@ -419,8 +456,22 @@ def name_holdings(icao: str, doc: dict) -> dict:
     return {**doc, "holdings": out}
 
 
+_prepared: dict[str, tuple] = {}  # icao -> (date of the data, cleaned doc): the clean-up costs ~200 ms on a big airport
+PREPARED_MAX = 40
+
+
 async def get_ground(icao: str, refresh: bool = False, user: dict | None = None) -> dict:
-    return name_holdings(icao.upper(), _clean_doc(await _get_ground(icao, refresh, user)))
+    code = icao.upper()
+    raw = await _get_ground(code, refresh, user)
+    hit = _prepared.get(code)
+    if hit and hit[0] == raw.get("fetched_at"):
+        return hit[1]
+    doc = name_holdings(code, _clean_doc(raw))
+    _prepared.pop(code, None)
+    if len(_prepared) >= PREPARED_MAX:
+        _prepared.pop(next(iter(_prepared)))
+    _prepared[code] = (raw.get("fetched_at"), doc)
+    return doc
 
 
 async def _get_ground(icao: str, refresh: bool = False, user: dict | None = None) -> dict:
@@ -487,10 +538,13 @@ def on_airport(doc: dict, lat: float, lon: float, max_m: float | None = 150.0) -
 
 
 async def build_taxi_path(icao: str, points: list[list[float]], start_gate: str | None, end_gate: str | None,
-                          origin: tuple[float, float] | None = None, end_point: tuple[float, float] | None = None) -> dict:
+                          origin: tuple[float, float] | None = None, end_point: tuple[float, float] | None = None,
+                          exit_runway: dict | None = None) -> dict:
     """Route along real taxiways, in the order the points were clicked: [start gate | aircraft] -> clicked points
     (snapped) -> [end gate | exact end point]. `origin`: the aircraft, when the route is changed while it taxies.
-    `end_point`: the holding point itself, which OpenStreetMap does not always draw exactly on the taxiway."""
+    `end_point`: the holding point itself, which OpenStreetMap does not always draw exactly on the taxiway.
+    `exit_runway`: the first point is the taxiway used to leave this runway (arrival, interrupted take-off): the route
+    starts where that taxiway meets the runway and goes on away from it."""
     g = await get_graph(icao)
     net = _Stops(g)
     stops: list[int] = []
@@ -521,8 +575,13 @@ async def build_taxi_path(icao: str, points: list[list[float]], start_gate: str 
     if len(stops) < 2:
         raise HTTPException(400, "Cliquez au moins un point de destination sur les voies de circulation.")
     seq = [stops[0]]
+    came_from_runway = None
+    if points and not origin and not start_gate and exit_runway is not None:
+        way = net.from_runway(stops[0], exit_runway or None)
+        if way and len(way) > 1:
+            came_from_runway = way[-2]  # the aircraft arrives on the exit from the runway: no going back that way
     for a, b in zip(stops, stops[1:]):
-        came_from = seq[-2] if len(seq) >= 2 else None
+        came_from = seq[-2] if len(seq) >= 2 else came_from_runway
         try:
             leg = g.route(a, b, net, came_from)  # pas de demi-tour au passage d'un point cliqué
         except HTTPException:

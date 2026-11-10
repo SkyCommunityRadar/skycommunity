@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -11,10 +12,12 @@ from lib.discord_roles import NO_ACCESS_MSG, ROLE_ADMIN, ROLE_ATC, ROLE_ATC_LEAD
 from lib.engine import utcnow
 from lib.events import log_event
 from lib.handover import close_positions
+from lib.security import client_ip, is_local_ip, is_new_account, security_settings
 from models.schemas import ModeIn, ProfileIn, UserOut
 from routers.common import upsert_discord_user, user_out
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+RESERVED_NAMES = {"admin", "administrateur", "administrator", "staff", "modérateur", "moderateur", "skycommunity", "créateur", "createur"}
 
 class TestLoginIn(BaseModel):
     discord_id: str = Field(pattern=r"^[0-9]{5,25}$")
@@ -31,7 +34,7 @@ def test_login_enabled() -> bool:
 async def test_login(body: TestLoginIn, response: Response, request: Request):
     """Simulates a Discord login with the given server roles (disabled unless ALLOW_TEST_LOGIN=true)."""
     host = (request.headers.get("host") or "").rsplit(":", 1)[0] if request is not None else ""
-    if not test_login_enabled() or host not in ("localhost", "127.0.0.1", "[::1]", "testserver"):
+    if not test_login_enabled() or host not in ("localhost", "127.0.0.1", "[::1]", "testserver") or not (is_local_ip(client_ip(request)) or host == "testserver"):
         # local tests only: even if ALLOW_TEST_LOGIN were left on by mistake, the public site never accepts it
         raise HTTPException(404, "Not Found")
     role_ids = {"pilote": ROLE_PILOTE, "atc": ROLE_ATC, "atc_lead": ROLE_ATC_LEAD, "admin": ROLE_ADMIN,
@@ -89,7 +92,15 @@ async def me(user: dict = Depends(current_user)):
 
 @router.patch("/me", response_model=UserOut)
 async def update_me(body: ProfileIn, user: dict = Depends(current_user)):
-    upd = {"display_name": body.display_name.strip(), "simbrief_id": (body.simbrief_id or "").strip() or None}
+    if user.get("role") != "admin" and (await security_settings())["lockdown"] and is_new_account(user):
+        raise HTTPException(403, "Mode anti-raid actif : les comptes créés il y a moins de 24 h sont en lecture seule pour le moment.")
+    name = body.display_name.strip()
+    if name != user.get("display_name"):
+        if name.casefold() in RESERVED_NAMES:
+            raise HTTPException(422, "Ce nom est réservé : choisissez-en un autre.")
+        if await db.users.find_one({"id": {"$ne": user["id"]}, "display_name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 1}):
+            raise HTTPException(409, "Ce nom est déjà utilisé par un autre membre.")
+    upd = {"display_name": name, "simbrief_id": (body.simbrief_id or "").strip() or None}
     await db.users.update_one({"id": user["id"]}, {"$set": upd})
     return user_out({**user, **upd})
 

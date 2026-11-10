@@ -1,7 +1,7 @@
 """Pydantic v2 request/response models. Mirrored by hand in frontend/src/lib/types.ts."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, model_validator, Field
 
@@ -9,6 +9,10 @@ Role = Literal["pilote", "atc", "admin", "aucun"]  # "aucun" = logged in, mode n
 
 
 # ---------- auth / users ----------
+# one clicked point on the map: exactly [latitude, longitude]
+LatLonPoint = Annotated[list[Annotated[float, Field(ge=-180, le=180)]], Field(min_length=2, max_length=2)]
+
+
 class Access(BaseModel):
     """Rights computed server-side from the Discord roles (lib/discord_roles)."""
     pilote: bool = False
@@ -129,7 +133,7 @@ class GroundSummary(BaseModel):
 
 class TaxiPreviewIn(BaseModel):
     kind: Literal["taxi_out", "taxi_in"]
-    points: list[list[float]] = Field(default_factory=list, max_length=30)
+    points: list[LatLonPoint] = Field(default_factory=list, max_length=30)
     holding_lat: float | None = Field(default=None, ge=-90, le=90)  # destination of a departure taxi
     holding_lon: float | None = Field(default=None, ge=-180, le=180)
 
@@ -238,6 +242,7 @@ class FlightDetail(FlightSummary):
     plan_meta: dict[str, str | int | float | None]
     taxi_out: TaxiRoute | None
     taxi_in: TaxiRoute | None
+    taxi_back: TaxiRoute | None = None  # interrupted take-off: way back to the stand
     allowed_actions: list[ActionInfo]
     step_prev: str | None = None  # phase « Étape précédente » leads to (None: no button)
     step_next: str | None = None
@@ -314,7 +319,7 @@ class ActionIn(BaseModel):
     pushback_dir: Literal["N", "NE", "E", "SE", "S", "SW", "W", "NW"] | None = None
     pushback_to: LatLon | None = None  # where the tug leaves the aircraft (clicked on the map)
     # take-off interrupted: points clicked from the exit taxiway on, then the new holding point or the stand
-    taxi_points: list[list[float]] = Field(default_factory=list, max_length=30)
+    taxi_points: list[LatLonPoint] = Field(default_factory=list, max_length=30)
     holding_ref: str | None = Field(default=None, max_length=40)
     holding_lat: float | None = Field(default=None, ge=-90, le=90)
     holding_lon: float | None = Field(default=None, ge=-180, le=180)
@@ -333,7 +338,7 @@ class ControlIn(BaseModel):
 
 class TaxiIn(BaseModel):
     kind: Literal["taxi_out", "taxi_in"]
-    points: list[list[float]] = Field(default_factory=list, max_length=30)
+    points: list[LatLonPoint] = Field(default_factory=list, max_length=30)
     version: int
     gate_ref: str | None = Field(default=None, max_length=40)  # arrival: the stand clicked as the last point
     # destination of a departure taxi, clicked on the map (omitted: the holding point already chosen)
@@ -503,6 +508,7 @@ class AtcPositionIn(BaseModel):
     icao: str = Field(min_length=3, max_length=4, pattern=r"^[A-Za-z0-9]{3,4}$")
     position: Literal["APP", "TWR", "GND"] | None = None
     frequency: str | None = Field(default=None, pattern=FREQ_PATTERN)
+    languages: str | None = Field(default=None, max_length=80)  # sent to the Discord bot when the position opens
 
 
 class PreopeningIn(AtcPositionIn):
@@ -555,6 +561,7 @@ class AtcPosition(BaseModel):
     id: str
     callsign: str
     type: str
+    languages: str | None = None
     frequency: str
     controller: str
     airport: str | None

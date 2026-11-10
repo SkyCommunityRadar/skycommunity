@@ -88,6 +88,7 @@ export default defineConfig(() => {
         "/api": {
           target: "http://localhost:8001",
           changeOrigin: true,
+          xfwd: true, // X-Forwarded-For written by the proxy: the backend sees the real visitor, not "localhost"
         },
       },
     },

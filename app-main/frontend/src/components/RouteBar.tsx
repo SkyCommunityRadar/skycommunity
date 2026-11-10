@@ -10,8 +10,15 @@ export const fmtDur = (s: number) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
 };
 
+/** Labels shown as chips start with a capital letter (« Au poste N08 »). */
+const cap = (s: string) => (s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s);
+
 /** Where the aircraft is right now, in a few words (same text in the list and on the flight page). */
 export function whereNow(f: FlightSummary): string {
+  return cap(whereNowRaw(f));
+}
+
+function whereNowRaw(f: FlightSummary): string {
   const p = f.position;
   const phase = f.phase === "suspendu" ? f.prev_phase ?? f.phase : f.phase;
   if (p.track === "air") {
@@ -33,7 +40,7 @@ export function flagsOf(f: FlightSummary): string[] {
     f.hold && !TAXIING_PHASES.has(phase) && tr("pause ATC"),
     p.paused && MOVING_PHASES.has(f.phase) && !f.hold && tr("progression figée"),
     p.kind === "manuelle" && tr("position manuelle"),
-  ].filter(Boolean) as string[];
+  ].filter(Boolean).map((x) => cap(x as string));
 }
 
 const CHIP = "inline-flex h-5 max-w-full items-center gap-1 rounded-full border px-2 text-[10px] font-semibold leading-none";

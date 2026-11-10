@@ -210,6 +210,8 @@ def detail(f: dict, user: dict, now: datetime, ctx: Ctx) -> FlightDetail:
         can_stop_taxi=active and may_act and f["phase"] in TAXI_PHASES,
         cruise_alt_ft=f.get("cruise_alt_ft"),
         plan_meta=f.get("plan_meta") or {}, taxi_out=_taxi(f.get("taxi_out")), taxi_in=_taxi(f.get("taxi_in")),
+        taxi_back=_taxi({**f["taxi_back"], "set_by_name": f["taxi_back"].get("set_by_name") or "", "set_at": f["taxi_back"].get("set_at") or f["updated_at"]})
+        if f["phase"] == "retour_parking" and f.get("taxi_back") else None,
         # « Étape préc./suiv. » masquée si une action de phase mène déjà au même état (évite doublons
         # du type « Retour en route » + « Étape précédente : En route »)
         step_prev=(

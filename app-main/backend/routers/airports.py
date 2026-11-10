@@ -100,14 +100,19 @@ async def taxi_preview(icao: str, body: TaxiPreviewIn, start_gate: str | None = 
     doc = await get_ground(code, user=user)
     if not all(on_airport(doc, p[0], p[1]) for p in body.points):
         raise HTTPException(422, f"Point hors de l'aéroport : cliquez sur une voie de {code}.")
-    origin = None
+    origin, exit_runway = None, None
     if flight_id:  # same anchoring as the saved route
         f = await db.flights.find_one({"id": flight_id}, {"_id": 0})
         if f:
             origin = taxi_origin(f, body.kind, utcnow())
+            if body.kind == "taxi_in" and not origin:
+                exit_runway = f["route"][-1].get("rwy") or {}  # arrival: from the runway, through the exit
+            elif body.kind == "taxi_out" and f["phase"] == "decollage":
+                exit_runway = f["route"][0].get("rwy") or {}  # interrupted take-off
             push = f.get("pushback_to") if f["phase"] == "repoussage" else None
             if body.kind == "taxi_out" and not origin and push:
                 origin = (push["lat"], push["lon"])
     end = (body.holding_lat, body.holding_lon) if body.kind == "taxi_out" and body.holding_lat is not None and body.holding_lon is not None else None
-    t = await build_taxi_path(code, body.points, None if origin else start_gate, end_gate, origin=origin, end_point=end)
+    t = await build_taxi_path(code, body.points, None if origin else start_gate, end_gate, origin=origin, end_point=end,
+                              exit_runway=exit_runway)
     return TaxiPreview(airport=t["airport"], path=t["path"], names=t["names"], length_nm=t["length_nm"])

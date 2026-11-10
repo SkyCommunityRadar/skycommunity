@@ -83,6 +83,8 @@ async def security_guard(request: Request, call_next):
         size = MAX_BODY_BYTES + 1
     if size > MAX_BODY_BYTES:
         return JSONResponse({"detail": "Requête trop volumineuse."}, status_code=413)
+    if "chunked" in request.headers.get("transfer-encoding", "").lower():  # no announced size: the limit could not apply
+        return JSONResponse({"detail": "Taille de la requête requise."}, status_code=411)
     # 2. flood / spam / brute force: per-IP request limits (lib/security.RULES)
     limited = check_rate(request)
     if limited:

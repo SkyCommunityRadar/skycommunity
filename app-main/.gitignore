@@ -89,3 +89,6 @@ android-sdk/
 
 .env
 **/.env
+
+# Database dumps contain personal data
+backups/

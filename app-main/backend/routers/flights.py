@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from lib.auth import authorize, require
 from lib.db import db
-from lib.engine import go_around, nudge_in_hold, reconcile_holding, reject_window_open, compute_position, hold_entered_at, start_holding, lined_up_since, marker_nm, move_marker, PUSH_MAX_M, PUSH_MIN_M, push_distance_m, TAXI_PHASES, ACTIONS, ACTIVE, AIR_PHASES, PHASES, taxi_origin, direct_to, taxi_block, enter_phase, rebase, snap_distance, \
+from lib.engine import go_around, go_around_possible, nudge_in_hold, reconcile_holding, reject_window_open, compute_position, hold_entered_at, start_holding, lined_up_since, marker_nm, move_marker, PUSH_MAX_M, PUSH_MIN_M, push_distance_m, TAXI_PHASES, ACTIONS, ACTIVE, AIR_PHASES, PHASES, taxi_origin, direct_to, taxi_block, enter_phase, rebase, snap_distance, \
     step_for, step_target, track_length, utcnow, aware
 from lib.events import log_event
 from lib.geo import haversine_nm
@@ -50,29 +50,30 @@ async def rejected_takeoff(f: dict, body, user: dict, now) -> None:
         if not hp:
             raise HTTPException(422, "Choisissez le nouveau point d'attente.")
         try:
-            t = await build_taxi_path(icao, body.taxi_points, None, None, end_point=(hp["lat"], hp["lon"]))
+            t = await build_taxi_path(icao, body.taxi_points, None, None, end_point=(hp["lat"], hp["lon"]),
+                                      exit_runway=f["route"][0].get("rwy") or {})
         except HTTPException as e:
             raise HTTPException(422, f"Roulage impossible ({e.detail}) : modifiez vos points.")
         rebase(f, now)
         enter_phase(f, "roulage", now)
         f["taxi_out"] = {**t, "points": [*body.taxi_points, [hp["lat"], hp["lon"]]], "rejected": True, "set_by_name": user["display_name"], "set_at": now}
         f["holding_point"] = {"ref": hp["ref"], "lat": hp["lat"], "lon": hp["lon"]}
-        f["progress"].update(track="taxi_out", anchor_dist=0.0, anchor_at=now)
+        f["progress"].update(track="taxi_out", anchor_dist=0.0, anchor_at=now, hold=True)  # attend « Commencer le roulage »
     else:
         gate = gate_ref(await get_graph(icao), body.gate_ref) if body.gate_ref else None
         if not gate:
             raise HTTPException(422, "Cliquez le poste de stationnement où retourner.")
         try:
-            t = await build_taxi_path(icao, body.taxi_points, None, gate["ref"])
+            t = await build_taxi_path(icao, body.taxi_points, None, gate["ref"], exit_runway=f["route"][0].get("rwy") or {})
         except HTTPException as e:
             raise HTTPException(422, f"Roulage impossible ({e.detail}) : modifiez vos points.")
         rebase(f, now)
         enter_phase(f, "retour_parking", now)
         f["phase"] = "retour_parking"
         f["dep_gate"] = gate
-        f["taxi_back"] = {**t, "points": body.taxi_points, "rejected": True}
+        f["taxi_back"] = {**t, "points": body.taxi_points, "rejected": True, "set_by_name": user["display_name"], "set_at": now}
         f["taxi_out"], f["holding_point"], f["pushback_to"] = None, None, None
-        f["progress"].update(track="taxi_back", anchor_dist=0.0, anchor_at=now)
+        f["progress"].update(track="taxi_back", anchor_dist=0.0, anchor_at=now, hold=True)  # attend « Commencer le roulage »
     f["lineup"] = None
     f["_exit_name"] = (t["names"] or ["le taxiway choisi"])[0]
 
@@ -225,6 +226,8 @@ async def do_action(flight_id: str, body: ActionIn, user: dict = Depends(require
     if f["phase"] not in a["frm"]:
         raise HTTPException(409, f"Transition refusée : « {a['label']} » impossible depuis l'état "
                                  f"« {PHASES[f['phase']]} ».")
+    if body.action == "go_around" and not go_around_possible(f, utcnow()):
+        raise HTTPException(409, "La remise de gaz se fait en courte finale (moins de 12 NM de la piste) ou après le toucher.")
     now = utcnow()
     before = f["phase"]
     to = f.get("prev_phase") if body.action == "reprendre" else a["to"]
@@ -260,10 +263,12 @@ async def do_action(flight_id: str, body: ActionIn, user: dict = Depends(require
         f["takeoff_cleared"] = True
         f["progress"]["hold"] = False  # continue le mouvement d'alignement → décollage auto
     else:
-        enter_phase(f, to, now)
         if body.action == "go_around":
-            go_around(f, now)
-        if to == "alignement":
+            go_around(f, now)  # from the aircraft's real position (enter_phase would move it to the STAR entry)
+            f["phase"], f["takeoff_cleared"] = "approche", False
+        else:
+            enter_phase(f, to, now)
+        if to == "alignement" and body.action != "reprendre":
             await lineup_on_taxiways(f)
         if cleared_lineup:
             f["takeoff_cleared"] = True
@@ -436,7 +441,7 @@ async def set_gates(flight_id: str, body: GatesIn, user: dict = Depends(require(
         if user["role"] == "atc" and not ctx.can_gate(f, "dep"):
             raise HTTPException(403, f"{f['departure']} ne relève d'aucune de vos positions : poste en lecture seule.")
         f["dep_gate"] = gate_ref(await get_graph(f["departure"]), body.dep_gate)
-        f["taxi_out"] = None  # the taxi started from the old stand
+        f["taxi_out"], f["holding_point"] = None, None  # both belonged to the old stand: to be chosen again
         changes.append(f"départ {body.dep_gate or '—'}")
     if body.arr_gate != (f.get("arr_gate") or {}).get("ref"):
         if user["role"] == "pilote" and f.get("arr_gate_by") == "atc":
@@ -450,7 +455,8 @@ async def set_gates(flight_id: str, body: GatesIn, user: dict = Depends(require(
             rebase(f, now)
             origin = taxi_origin(f, "taxi_in", now)
             try:
-                t = await build_taxi_path(f["arrival"], [] if origin else f["taxi_in"].get("points") or [], None, body.arr_gate, origin=origin) if body.arr_gate else None
+                t = await build_taxi_path(f["arrival"], [] if origin else f["taxi_in"].get("points") or [], None, body.arr_gate, origin=origin,
+                                          exit_runway=None if origin else (f["route"][-1].get("rwy") or {})) if body.arr_gate else None
             except HTTPException:
                 t = None
             on_it = f["progress"].get("track") == "taxi_in"
@@ -507,7 +513,8 @@ async def set_taxi(flight_id: str, body: TaxiIn, user: dict = Depends(require("f
     was_on_track = f["progress"].get("track") == body.kind
     try:
         t = await build_taxi_path(icao, body.points, gate.get("ref") if out and not origin else None,
-                                  None if out else gate.get("ref"), origin=origin, end_point=end)
+                                  None if out else gate.get("ref"), origin=origin, end_point=end,
+                                  exit_runway=None if out or origin else (f["route"][-1].get("rwy") or {}))
     except HTTPException as e:
         raise HTTPException(422, e.detail)
     rebase(f, now)
