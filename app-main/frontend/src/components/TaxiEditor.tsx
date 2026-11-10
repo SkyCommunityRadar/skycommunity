@@ -81,7 +81,7 @@ export default function TaxiEditor({ flight, kind, editing, points, setPoints, o
     <div className="space-y-2 text-xs" data-testid={`taxi-editor-${kind}`}>
       {editing ? (
         <div className="space-y-2">
-          <p className="text-[#4AA8F0]">
+          <p className="text-[color:var(--sc-accent)]">
             {out
               ? live
                 ? tr("L'avion roule : le nouveau tracé part de sa position. Cliquez les voies à emprunter, point par point, jusqu'à la destination.")

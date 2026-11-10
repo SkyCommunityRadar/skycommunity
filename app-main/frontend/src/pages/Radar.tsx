@@ -114,7 +114,7 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
   const activeTab = tab === "vol" && !selected ? (isAtc ? "strips" : "vols") : tab;
 
   return (
-    <div className="flex h-full flex-col md:flex-row">
+    <div className="flex h-full flex-col lg:flex-row">
       <section className="relative min-h-[16dvh] flex-1 bg-radar">
         <RadarMap
           flights={list}
@@ -146,7 +146,7 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
           focusKey={focus?.k}
         />
         <button
-          className="absolute right-3 top-3 z-[600] flex h-10 items-center gap-1.5 rounded-lg border border-border bg-background/90 px-3 text-sm text-muted-foreground backdrop-blur transition-colors duration-150 hover:bg-secondary hover:text-[#4AA8F0]"
+          className="absolute right-3 top-3 z-[600] flex h-10 items-center gap-1.5 rounded-lg border border-border bg-background/90 px-3 text-sm text-muted-foreground backdrop-blur transition-colors duration-150 hover:bg-secondary hover:text-[color:var(--sc-accent)]"
           onClick={() => setPanelOpen((o) => !o)}
           title={panelOpen ? tr("Masquer le panneau") : tr("Afficher le panneau")}
           data-testid="toggle-right-panel"
@@ -170,12 +170,12 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
           <Button size="sm" variant="secondary" onClick={searchAirport} data-testid="map-airport-search-button">{tr("Aller")}</Button>
         </div>
         {selected && ed.banner && (
-          <div className="absolute left-1/2 top-16 z-[600] -translate-x-1/2 rounded-lg border border-[#4AA8F0]/50 bg-background/90 px-3 py-1.5 text-xs text-[#7CC0F5] backdrop-blur" data-testid="map-mode-banner">
+          <div className="absolute left-1/2 top-16 z-[600] -translate-x-1/2 rounded-lg border border-[color:var(--sc-accent)]/50 bg-background/90 px-3 py-1.5 text-xs text-[color:var(--sc-accent-soft)] backdrop-blur" data-testid="map-mode-banner">
             {ed.banner}
           </div>
         )}
         {nearby.loading.length > 0 && (
-          <div className="absolute bottom-6 left-1/2 z-[500] -translate-x-1/2 rounded-lg border border-[#4AA8F0]/40 bg-background/90 px-3 py-1.5 text-xs text-[#7CC0F5] backdrop-blur" data-testid="ground-loading">{tr("Chargement du plan de {0} (OpenStreetMap)…", [nearby.loading.join(", ")])}</div>
+          <div className="absolute bottom-6 left-1/2 z-[500] -translate-x-1/2 rounded-lg border border-[color:var(--sc-accent)]/40 bg-background/90 px-3 py-1.5 text-xs text-[color:var(--sc-accent-soft)] backdrop-blur" data-testid="ground-loading">{tr("Chargement du plan de {0} (OpenStreetMap)…", [nearby.loading.join(", ")])}</div>
         )}
         {(apFound || apError) && (
           <div
@@ -184,7 +184,7 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
           >
             {apError ?? (
               <>
-                <span className="font-mono font-semibold text-[#4AA8F0]">{apFound!.icao}</span> {apFound!.name}
+                <span className="font-mono font-semibold text-[color:var(--sc-accent)]">{apFound!.icao}</span> {apFound!.name}
               </>
             )}
           </div>
@@ -199,22 +199,23 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
-              "flex shrink-0 flex-col overflow-hidden border-t border-border bg-card transition-[max-height] duration-300 md:max-h-none md:border-l md:border-t-0",
+              "flex shrink-0 flex-col overflow-hidden border-t border-border bg-card transition-[max-height] duration-300 lg:max-h-none lg:border-l lg:border-t-0",
               tall ? "max-h-[78dvh]" : "max-h-[50dvh]",
             )}
             data-testid="radar-right-panel"
           >
+            <div className="theme-stripe" aria-hidden />
             <button
               type="button"
               onClick={() => setTall((t) => !t)}
-              className="flex h-6 w-full shrink-0 items-center justify-center gap-1 text-[11px] text-muted-foreground active:bg-secondary md:hidden"
+              className="flex h-6 w-full shrink-0 items-center justify-center gap-1 text-[11px] text-muted-foreground active:bg-secondary lg:hidden"
               aria-label={tall ? tr("Réduire le panneau") : tr("Agrandir le panneau")}
               data-testid="radar-panel-resize"
             >
               <span className="h-1 w-10 rounded-full bg-border" />
               {tall ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
             </button>
-            <div className="no-scrollbar flex w-full shrink-0 overflow-x-auto border-b border-border md:w-[26rem]" role="tablist">
+            <div className="no-scrollbar flex w-full shrink-0 overflow-x-auto border-b border-border lg:w-[26rem]" role="tablist">
               {tabs.map(({ k, label }) => (
                 <button
                   key={k}
@@ -223,7 +224,7 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
                   onClick={() => setTab(k)}
                   className={cn(
                     "flex-1 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] font-medium transition-[color,border-color] duration-150 sm:px-3 sm:py-3 sm:text-sm",
-                    activeTab === k ? "border-[#4AA8F0] text-[#4AA8F0]" : "border-transparent text-muted-foreground hover:text-foreground",
+                    activeTab === k ? "border-[color:var(--sc-accent)] text-[color:var(--sc-accent)]" : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                   data-testid={`radar-tab-${k}`}
                 >
@@ -231,7 +232,7 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
                 </button>
               ))}
             </div>
-            <div className="min-h-0 w-full flex-1 overflow-y-auto md:w-[26rem]">
+            <div className="min-h-0 w-full flex-1 overflow-y-auto lg:w-[26rem]">
               <AnimatePresence mode="wait">
                 <motion.div key={activeTab + (activeTab === "vol" ? selected?.id ?? "" : "")} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
                   {activeTab === "vol" && selected ? (

@@ -31,7 +31,7 @@ export function ProfileCard({ p }: { p: PublicProfile }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-5 rounded-xl border border-border bg-card p-6">
         {p.avatar_url ? (
-          <img src={p.avatar_url} alt="" className="h-20 w-20 rounded-full ring-2 ring-[#4AA8F0]/50" data-testid="profile-avatar" />
+          <img src={p.avatar_url} alt="" className="h-20 w-20 rounded-full ring-2 ring-[color:var(--sc-accent)]/50" data-testid="profile-avatar" />
         ) : (
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary text-3xl font-bold" data-testid="profile-avatar">
             {p.display_name.slice(0, 1).toUpperCase()}
@@ -44,7 +44,7 @@ export function ProfileCard({ p }: { p: PublicProfile }) {
             {p.is_creator && <span className="rounded-md bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-300" data-testid="profile-badge-creator">{tr("Créateur")}</span>}
             {p.is_admin && !p.is_creator && <span className="rounded-md bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300" data-testid="profile-badge-admin">{tr("Administrateur")}</span>}
             {p.is_atc_lead && <span className="rounded-md bg-violet-500/15 px-2 py-0.5 font-semibold text-violet-300" data-testid="profile-badge-atc-lead">{tr("Responsable ATC")}</span>}
-            {p.level && <span className="rounded-md bg-[#2B63C9]/20 px-2 py-0.5 font-semibold text-[#4AA8F0]" data-testid="profile-level">{p.level}</span>}
+            {p.level && <span className="rounded-md bg-[color:var(--sc-primary)]/20 px-2 py-0.5 font-semibold text-[color:var(--sc-accent)]" data-testid="profile-level">{p.level}</span>}
             {p.atc_allowed && <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-emerald-300">{tr("ATC")}</span>}
           </div>
         </div>
@@ -56,7 +56,7 @@ export function ProfileCard({ p }: { p: PublicProfile }) {
       </div>
       <div className={`grid grid-cols-2 gap-3 ${stats.length === 5 ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
         {stats.map(([l, v, id]) => (
-          <div key={id} className="rounded-xl border border-border bg-card p-4 transition-colors duration-150 hover:border-[#4AA8F0]/50">
+          <div key={id} className="rounded-xl border border-border bg-card p-4 transition-colors duration-150 hover:border-[color:var(--sc-accent)]/50">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{tr(l)}</div>
             <div className="mt-1 font-mono text-2xl font-bold" data-testid={`profile-stat-${id}`}>{v}</div>
           </div>

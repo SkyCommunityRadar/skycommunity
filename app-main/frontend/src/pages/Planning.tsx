@@ -89,7 +89,7 @@ function SlotForm({ initial, submitLabel, busy, onSubmit, onCancel, withReason }
             key={k}
             type="button"
             onClick={() => setKind(k)}
-            className={cn("flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-semibold transition-colors", kind === k ? "bg-[#2B63C9] text-white" : "text-muted-foreground hover:text-foreground")}
+            className={cn("flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-semibold transition-colors", kind === k ? "bg-[color:var(--sc-primary)] text-white" : "text-muted-foreground hover:text-foreground")}
           >
             <Icon className="h-3.5 w-3.5" /> {tr(l)}
           </button>
@@ -98,11 +98,11 @@ function SlotForm({ initial, submitLabel, busy, onSubmit, onCancel, withReason }
       <div className="grid grid-cols-2 gap-2">
         <label className="space-y-1">
           <span className="text-[11px] text-muted-foreground">{tr("Jour (UTC)")}</span>
-          <input type="date" value={date} min={todayUtc()} onChange={(e) => setDate(e.target.value)} required className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm outline-none focus:border-[#4AA8F0]" data-testid="planning-date" />
+          <input type="date" value={date} min={todayUtc()} onChange={(e) => setDate(e.target.value)} required className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid="planning-date" />
         </label>
         <label className="space-y-1">
           <span className="text-[11px] text-muted-foreground">{kind === "airport" ? tr("Aéroport (OACI)") : tr("Centre (OACI)")}</span>
-          <input value={icao} onChange={(e) => setIcao(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={4} placeholder={kind === "airport" ? "LFPG" : "LFFF"} required className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[#4AA8F0]" data-testid="planning-icao" />
+          <input value={icao} onChange={(e) => setIcao(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={4} placeholder={kind === "airport" ? "LFPG" : "LFFF"} required className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid="planning-icao" />
         </label>
       </div>
       {kind === "airport" ? (
@@ -112,7 +112,7 @@ function SlotForm({ initial, submitLabel, busy, onSubmit, onCancel, withReason }
               key={p}
               type="button"
               onClick={() => setPosition(p)}
-              className={cn("rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors", position === p ? "border-[#4AA8F0] bg-[#2B63C9]/25 text-white" : "border-border text-muted-foreground hover:text-foreground")}
+              className={cn("rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors", position === p ? "border-[color:var(--sc-accent)] bg-[color:var(--sc-primary)]/25 text-white" : "border-border text-muted-foreground hover:text-foreground")}
               data-testid={`planning-position-${p}`}
             >
               {p}
@@ -125,11 +125,11 @@ function SlotForm({ initial, submitLabel, busy, onSubmit, onCancel, withReason }
       <div className="grid grid-cols-3 gap-2">
         <label className="space-y-1">
           <span className="text-[11px] text-muted-foreground">{tr("Début (UTC)")}</span>
-          <input type="time" value={start} onChange={(e) => setStart(e.target.value)} required className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[#4AA8F0]" data-testid="planning-start" />
+          <input type="time" value={start} onChange={(e) => setStart(e.target.value)} required className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid="planning-start" />
         </label>
         <label className="space-y-1">
           <span className="text-[11px] text-muted-foreground">{tr("Fin (UTC)")}</span>
-          <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} required className={cn("w-full rounded-md border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[#4AA8F0]", end <= start ? "border-red-500" : "border-border")} data-testid="planning-end" />
+          <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} required className={cn("w-full rounded-md border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[color:var(--sc-accent)]", end <= start ? "border-red-500" : "border-border")} data-testid="planning-end" />
         </label>
         <label className="space-y-1">
           <span className="text-[11px] text-muted-foreground">{tr("Fréquence")}</span>
@@ -141,7 +141,7 @@ function SlotForm({ initial, submitLabel, busy, onSubmit, onCancel, withReason }
             }}
             maxLength={7}
             placeholder="118.650"
-            className={cn("w-full rounded-md border bg-card px-2 py-1.5 font-mono text-sm text-amber-200 outline-none focus:border-[#4AA8F0]", freq && !FREQ_RE.test(freq) ? "border-red-500" : "border-border")}
+            className={cn("w-full rounded-md border bg-card px-2 py-1.5 font-mono text-sm text-amber-200 outline-none focus:border-[color:var(--sc-accent)]", freq && !FREQ_RE.test(freq) ? "border-red-500" : "border-border")}
             data-testid="planning-frequency"
           />
         </label>
@@ -149,13 +149,13 @@ function SlotForm({ initial, submitLabel, busy, onSubmit, onCancel, withReason }
       {ready && info.isError && <p className="text-xs text-red-400">{errMsg(info.error)}</p>}
       {info.data && (
         <p className="text-[11px] text-muted-foreground">
-          <span className="font-mono text-[#7CC0F5]">{info.data.icao}_{pos}</span> · {info.data.name}
+          <span className="font-mono text-[color:var(--sc-accent-soft)]">{info.data.icao}_{pos}</span> · {info.data.name}
           {!info.data.frequency && tr(" · aucune fréquence connue : saisissez-la")}
         </p>
       )}
       {end <= start && <p className="text-xs text-red-400">{tr("L'heure de fin doit être après l'heure de début.")}</p>}
       {withReason && (
-        <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder={tr("Motif de la modification (facultatif)")} className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm outline-none focus:border-[#4AA8F0]" data-testid="planning-reason" />
+        <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder={tr("Motif de la modification (facultatif)")} className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid="planning-reason" />
       )}
       <div className="flex gap-2">
         {onCancel && (
@@ -212,7 +212,7 @@ function RequestsPanel({ lead }: { lead: boolean }) {
         {list.map((r) => (
           <motion.div key={r.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3" data-testid={`planning-request-${r.id}`}>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <b className="font-mono text-[#7CC0F5]">{r.callsign}</b>
+              <b className="font-mono text-[color:var(--sc-accent-soft)]">{r.callsign}</b>
               <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{tr("En attente")}</span>
             </div>
             <div className="text-[11px] text-muted-foreground">{tr("Demandée par")}{" "}<b className="text-foreground">{r.requested_by}</b>{" "}{tr("le")}{" "}{fmtDateTime(r.requested_at)}
@@ -221,7 +221,7 @@ function RequestsPanel({ lead }: { lead: boolean }) {
             {r.reason && <p className="text-xs italic text-muted-foreground">« {r.reason} »</p>}
             {lead && (
               <div className="space-y-2">
-                <input value={comment[r.id] ?? ""} onChange={(e) => setComment({ ...comment, [r.id]: e.target.value })} maxLength={200} placeholder={tr("Commentaire (facultatif)")} className="w-full rounded-md border border-border bg-card px-2 py-1 text-xs outline-none focus:border-[#4AA8F0]" />
+                <input value={comment[r.id] ?? ""} onChange={(e) => setComment({ ...comment, [r.id]: e.target.value })} maxLength={200} placeholder={tr("Commentaire (facultatif)")} className="w-full rounded-md border border-border bg-card px-2 py-1 text-xs outline-none focus:border-[color:var(--sc-accent)]" />
                 <div className="grid grid-cols-2 gap-2">
                   <Button size="lg" variant="destructive" disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, decision: "refuse" })} data-testid={`planning-refuse-${r.id}`}>
                     <X className="h-4 w-4" />{" "}{tr("Refuser")}</Button>
@@ -274,7 +274,7 @@ function SlotCard({ s, me, onChanged }: { s: PlanningSlot; me: User; onChanged: 
   });
   const mine = s.user_id === me.id;
   return (
-    <motion.div layout initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={cn("min-w-0 space-y-2 rounded-xl border bg-background/60 p-3", mine ? "border-[#2B63C9]/50" : "border-border")} style={{ borderLeft: `3px solid ${color}` }} data-testid={`planning-slot-${s.callsign}`}>
+    <motion.div layout initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={cn("min-w-0 space-y-2 rounded-xl border bg-background/60 p-3", mine ? "border-[color:var(--sc-primary)]/50" : "border-border")} style={{ borderLeft: `3px solid ${color}` }} data-testid={`planning-slot-${s.callsign}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <span className="font-mono text-base font-bold" style={{ color }}>{s.callsign}</span>
         <span className="font-mono text-sm text-amber-200">{s.frequency}</span>
@@ -289,7 +289,7 @@ function SlotCard({ s, me, onChanged }: { s: PlanningSlot; me: User; onChanged: 
       )}
       {s.last_change_by && !s.pending_request && <div className="text-[10px] text-emerald-300/80">{tr("Modifiée · validée par {0}", [s.last_change_by])}</div>}
       {editing ? (
-        <div className="rounded-lg border border-[#2B63C9]/40 bg-card p-2">
+        <div className="rounded-lg border border-[color:var(--sc-primary)]/40 bg-card p-2">
           <SlotForm initial={{ ...s, position: s.position as PlanningIn["position"] }} withReason submitLabel={tr("Envoyer la demande")} busy={req.isPending} onSubmit={(b) => req.mutate(b)} onCancel={() => setEditing(false)} />
         </div>
       ) : confirmDel ? (
@@ -346,7 +346,7 @@ function PlanningView({ user }: { user: User }) {
     <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><CalendarDays className="h-5 w-5 text-[#4AA8F0]" />{" "}{tr("Planning ATC")}</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><CalendarDays className="h-5 w-5 text-[color:var(--sc-accent)]" />{" "}{tr("Planning ATC")}</h1>
           <p className="text-xs text-muted-foreground">{tr("Les ouvertures annoncées par les contrôleurs. Toutes les heures sont en UTC.")}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
@@ -360,8 +360,8 @@ function PlanningView({ user }: { user: User }) {
       <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
         <div className="space-y-5">
           {canPublish && (
-            <section className="space-y-3 rounded-2xl border border-[#2B63C9]/40 bg-gradient-to-b from-[#12264A] to-card p-4" data-testid="planning-create">
-              <h2 className="flex items-center gap-2 text-sm font-semibold"><Radio className="h-4 w-4 text-[#4AA8F0]" />{" "}{tr("Annoncer une disponibilité")}</h2>
+            <section className="space-y-3 rounded-2xl border border-[color:var(--sc-primary)]/40 bg-gradient-to-b from-[color:var(--sc-glow)] to-card p-4" data-testid="planning-create">
+              <h2 className="flex items-center gap-2 text-sm font-semibold"><Radio className="h-4 w-4 text-[color:var(--sc-accent)]" />{" "}{tr("Annoncer une disponibilité")}</h2>
               <SlotForm submitLabel={tr("Publier")} busy={create.isPending} onSubmit={(b) => create.mutate(b)} />
               <p className="text-[10px] text-muted-foreground">{tr("Une fois publiée, toute modification passe par une demande validée par un administrateur ou le Responsable ATC.")}</p>
             </section>
@@ -378,7 +378,7 @@ function PlanningView({ user }: { user: User }) {
                 key={d}
                 className={cn(
                   "flex flex-col gap-2 rounded-2xl border p-3 sm:flex-row sm:gap-4",
-                  d === today ? "border-[#4AA8F0]/60 bg-[#2B63C9]/10" : "border-border bg-card/60",
+                  d === today ? "border-[color:var(--sc-accent)]/60 bg-[color:var(--sc-primary)]/10" : "border-border bg-card/60",
                   d < today && "opacity-60",
                 )}
                 data-testid={`planning-day-${d}`}
@@ -386,7 +386,7 @@ function PlanningView({ user }: { user: User }) {
                 <div className="flex shrink-0 items-baseline gap-2 sm:w-28 sm:flex-col sm:gap-0.5 sm:pt-1">
                   <span className="text-sm font-semibold">{tr(DAY_FR[i])}</span>
                   <span className="text-xs text-muted-foreground">{label(d)}</span>
-                  {d === today && <span className="rounded-full bg-[#2B63C9] px-2 py-0.5 text-[10px] font-semibold text-white sm:mt-1">{tr("Aujourd'hui")}</span>}
+                  {d === today && <span className="rounded-full bg-[color:var(--sc-primary)] px-2 py-0.5 text-[10px] font-semibold text-white sm:mt-1">{tr("Aujourd'hui")}</span>}
                 </div>
                 {slots.length === 0 ? (
                   <p className="text-xs text-muted-foreground/70 sm:self-center">{tr("Aucune ouverture prévue")}</p>

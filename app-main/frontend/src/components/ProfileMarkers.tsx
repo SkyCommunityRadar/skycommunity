@@ -25,7 +25,7 @@ export default function ProfileMarkers({ flight: f }: { flight: FlightDetail }) 
       {rows.map(({ k, nm, title, Icon }) => (
         <div key={k} className="space-y-1.5 rounded-lg border border-border bg-background/40 p-2.5" data-testid={`profile-${k}`}>
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs">
-            <span className="flex items-center gap-1.5 whitespace-nowrap font-semibold"><Icon className="h-3.5 w-3.5 text-[#4AA8F0]" /> {title}</span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap font-semibold"><Icon className="h-3.5 w-3.5 text-[color:var(--sc-accent)]" /> {title}</span>
             <span className="font-mono text-muted-foreground">{tr("à {0} NM du départ", [nm!.toFixed(0)])}{inAir && (nm! >= here ? tr(" · dans {0} NM", [(nm! - here).toFixed(0)]) : tr(" · passé de {0} NM", [(here - nm!).toFixed(0)]))}
             </span>
           </div>

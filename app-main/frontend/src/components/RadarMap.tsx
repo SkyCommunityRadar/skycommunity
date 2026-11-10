@@ -642,7 +642,7 @@ export default function RadarMap(p: Props) {
   }, [p.flights, p.selectedId]);
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative isolate h-full w-full">
       <div ref={el} className="h-full w-full" data-testid={p.testId ?? "radar-map"} />
       {baseError && (
         <div className="absolute bottom-14 left-1/2 z-[650] -translate-x-1/2 rounded border border-amber-500/50 bg-background/95 px-3 py-1.5 text-[11px] text-amber-200" data-testid="map-base-error">

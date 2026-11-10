@@ -42,7 +42,7 @@ export default function InstallApp({ compact = false }: { compact?: boolean }) {
       <Button variant="outline" size={compact ? "sm" : "default"} onClick={install} className="w-full" data-testid="install-app-button">
         <Download className="h-4 w-4" />{" "}{tr("Installer l'appli SkyCommunity Radar")}</Button>
       {help && (
-        <div className="relative space-y-2 rounded-lg border border-[#4AA8F0]/40 bg-[#4AA8F0]/5 p-3 text-left text-xs leading-relaxed" data-testid="install-app-help">
+        <div className="relative space-y-2 rounded-lg border border-[color:var(--sc-accent)]/40 bg-[color:var(--sc-accent)]/5 p-3 text-left text-xs leading-relaxed" data-testid="install-app-help">
           <button onClick={() => setHelp(false)} className="absolute right-2 top-2 text-muted-foreground" aria-label={tr("Fermer")}>
             <X className="h-4 w-4" />
           </button>

@@ -92,7 +92,7 @@ export default function RouteBar({ f, large = false }: { f: FlightSummary; large
         <span className="min-w-0 truncate text-[11px] font-semibold text-foreground/90">{f.pilot_name}</span>
         <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
           {(where || (air && p.total_s)) ? (
-            <span className={cn(CHIP, "border-[#4AA8F0]/30 bg-[#2B63C9]/12 text-[#9CCBF5]")} data-testid={`flight-row-where-${f.callsign}`}>
+            <span className={cn(CHIP, "border-[color:var(--sc-accent)]/30 bg-[color:var(--sc-primary)]/12 text-[color:var(--sc-accent-softer)]")} data-testid={`flight-row-where-${f.callsign}`}>
               <WhereIcon className="h-3 w-3 shrink-0" />
               <span className="truncate">
                 {where}

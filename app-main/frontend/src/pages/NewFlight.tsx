@@ -58,7 +58,7 @@ function SimbriefTab({ user }: { user: User }) {
     <div className="grid h-full min-h-0 grid-cols-1 gap-4 md:grid-cols-[22rem_1fr]">
       <div className="space-y-4 overflow-y-auto">
         <form
-          className="space-y-3 rounded-2xl border border-[#2B63C9]/40 bg-gradient-to-b from-[#12264A] to-card p-4 shadow-lg"
+          className="space-y-3 rounded-2xl border border-[color:var(--sc-primary)]/40 bg-gradient-to-b from-[color:var(--sc-glow)] to-card p-4 shadow-lg"
           onSubmit={(e) => {
             e.preventDefault();
             fetchM.mutate();
@@ -86,7 +86,7 @@ function SimbriefTab({ user }: { user: User }) {
           <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={fetchM.isPending || !identifier.trim()} data-testid="simbrief-fetch-button">
             <Download className="h-4 w-4" /> {fetchM.isPending ? tr("Récupération…") : tr("Importer mon plan SimBrief")}
           </Button>
-          <a href="https://www.simbrief.com/system/dispatch.php" target="_blank" rel="noopener noreferrer" className="block text-center text-[11px] text-[#7CC0F5] hover:underline">{tr("Pas encore de plan ? Le générer sur simbrief.com")}</a>
+          <a href="https://www.simbrief.com/system/dispatch.php" target="_blank" rel="noopener noreferrer" className="block text-center text-[11px] text-[color:var(--sc-accent-soft)] hover:underline">{tr("Pas encore de plan ? Le générer sur simbrief.com")}</a>
           {error && (
             <p className="rounded border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300" data-testid="simbrief-error">
               {error}
@@ -129,7 +129,7 @@ function SimbriefTab({ user }: { user: User }) {
               </ul>
             )}
             <div className="text-[11px] text-muted-foreground">{tr("{0} points de navigation", [p.waypoints.length])}</div>
-            <div className="space-y-2 rounded border border-[#2B63C9]/40 bg-[#2B63C9]/5 p-2.5">
+            <div className="space-y-2 rounded border border-[color:var(--sc-primary)]/40 bg-[color:var(--sc-primary)]/5 p-2.5">
               <div className="text-[11px] font-medium">{tr("Votre porte / poste de stationnement")}</div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -160,8 +160,8 @@ function SimbriefTab({ user }: { user: User }) {
           focusKey={p ? `${p.draft_id}-${depGround.data ? "sol" : "attente"}-${chosen?.ref ?? ""}` : undefined}
         />
         {p && depGround.isLoading && (
-          <div className="absolute left-1/2 top-4 z-[650] flex -translate-x-1/2 items-center gap-2 rounded-lg border border-[#4AA8F0]/40 bg-background/95 px-3 py-2 text-xs shadow-lg" data-testid="dep-ground-loading">
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#4AA8F0] border-t-transparent" />{tr("Chargement des portes de")}{" "}{p.departure}{tr("… (jusqu'à 1 min la première fois)")}</div>
+          <div className="absolute left-1/2 top-4 z-[650] flex -translate-x-1/2 items-center gap-2 rounded-lg border border-[color:var(--sc-accent)]/40 bg-background/95 px-3 py-2 text-xs shadow-lg" data-testid="dep-ground-loading">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-[color:var(--sc-accent)] border-t-transparent" />{tr("Chargement des portes de")}{" "}{p.departure}{tr("… (jusqu'à 1 min la première fois)")}</div>
         )}
       </div>
     </div>

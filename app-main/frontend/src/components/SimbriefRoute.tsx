@@ -24,14 +24,14 @@ function End({ kind, icao, name, rwy, flight }: { kind: "dep" | "arr"; icao: str
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Icon className="h-3.5 w-3.5" /> {kind === "dep" ? tr("Départ") : tr("Arrivée")}
       </div>
-      <div className="mt-1 font-mono text-lg font-bold text-[#4AA8F0]">{icao}</div>
+      <div className="mt-1 font-mono text-lg font-bold text-[color:var(--sc-accent)]">{icao}</div>
       <div className="truncate text-[11px] text-muted-foreground" title={name ?? undefined}>{name ?? "—"}</div>
       {editable && options.length > 0 ? (
         <label className="mt-2 flex items-center gap-1.5 text-xs">{tr("Piste")}<select
             value={rwy ?? ""}
             disabled={m.isPending}
             onChange={(e) => change(e.target.value)}
-            className="min-w-0 flex-1 rounded-md border border-[#4AA8F0]/50 bg-card px-1.5 py-1 font-mono font-bold text-amber-200 outline-none focus:border-[#4AA8F0]"
+            className="min-w-0 flex-1 rounded-md border border-[color:var(--sc-accent)]/50 bg-card px-1.5 py-1 font-mono font-bold text-amber-200 outline-none focus:border-[color:var(--sc-accent)]"
             title={tr("Changer de piste : le trajet est recalculé sur la nouvelle piste")}
             data-testid={`route-${kind}-rwy-select`}
           >

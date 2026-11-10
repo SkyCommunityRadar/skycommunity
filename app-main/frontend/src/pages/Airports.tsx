@@ -72,7 +72,7 @@ function AirportsView({ user }: { user: User }) {
                   className={`w-full rounded px-2 py-1.5 text-left text-xs transition-colors duration-150 ${icao === a.icao ? "bg-accent" : "hover:bg-accent/50"}`}
                   data-testid={`airport-item-${a.icao}`}
                 >
-                  <span className="font-mono font-semibold text-[#4AA8F0]">{a.icao}</span> {a.name}
+                  <span className="font-mono font-semibold text-[color:var(--sc-accent)]">{a.icao}</span> {a.name}
                   <div className="text-[10px] text-muted-foreground">{tr("{0} postes · {1}", [a.gates, fmtDateTime(a.fetched_at)])}</div>
                 </button>
               </li>
@@ -81,7 +81,7 @@ function AirportsView({ user }: { user: User }) {
         </div>
         {icao && (
           <div className="space-y-2" data-testid="airport-detail">
-            {g.isLoading && <p className="text-xs text-[#4AA8F0]">{tr("Chargement du plan au sol de {0}…", [icao])}</p>}
+            {g.isLoading && <p className="text-xs text-[color:var(--sc-accent)]">{tr("Chargement du plan au sol de {0}…", [icao])}</p>}
             {g.isError && (
               <p className="text-xs text-red-400" data-testid="airport-error">
                 {errMsg(g.error)}
@@ -104,7 +104,7 @@ function AirportsView({ user }: { user: User }) {
                     <button
                       key={x.ref}
                       onClick={() => setFocus({ c: [x.lat, x.lon], k: `${x.ref}-${Date.now()}` })}
-                      className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] hover:border-[#4AA8F0] transition-colors duration-150"
+                      className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] hover:border-[color:var(--sc-accent)] transition-colors duration-150"
                       data-testid={`gate-chip-${x.ref}`}
                     >
                       {x.ref}

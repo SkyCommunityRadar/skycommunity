@@ -43,7 +43,7 @@ export default function AtcControls({
           )}
         </div>
         {(mode === "snap" || mode === "free") && (
-          <p className="text-[#4AA8F0]" data-testid="ctl-pick-hint">{tr("Cliquez sur la carte pour placer l'avion.")}</p>
+          <p className="text-[color:var(--sc-accent)]" data-testid="ctl-pick-hint">{tr("Cliquez sur la carte pour placer l'avion.")}</p>
         )}
       </div>
 

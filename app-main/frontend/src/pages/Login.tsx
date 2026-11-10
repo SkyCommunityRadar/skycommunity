@@ -7,6 +7,7 @@ import { FileText, Heart, Plane, RadioTower } from "lucide-react";
 import { DiscordIcon } from "@/components/AppShell";
 import { apiGet } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
+import { ThemeGarland, ThemeGreeting, ThemeHat } from "@/components/ThemeDecor";
 import { DONATE_URL } from "@/lib/siteConfig";
 
 import { labels, tr } from "@/lib/i18n";
@@ -30,7 +31,7 @@ const FEATURES = [
 function RadarBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#0E2546_0%,#070D1A_55%,#04070F_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--sc-glow)_0%,var(--sc-topbar)_55%,var(--sc-deep)_100%)]" />
       <svg className="absolute left-1/2 top-1/2 h-[160vmax] w-[160vmax] -translate-x-1/2 -translate-y-1/2 opacity-[0.22]" viewBox="-100 -100 200 200">
         {[18, 36, 54, 72, 90].map((r) => (
           <circle key={r} r={r} fill="none" stroke="#4AA8F0" strokeWidth="0.15" />
@@ -54,7 +55,7 @@ export default function Login() {
   if (me.isSuccess) return <Navigate to={from === "/login" ? "/" : from} replace />;
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#04070F] px-4 py-10">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[color:var(--sc-deep)] px-4 py-10">
       <RadarBackdrop />
       <LangSwitch className="absolute right-4 top-4 z-20" />
       <motion.main
@@ -63,12 +64,14 @@ export default function Login() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 flex w-full max-w-3xl flex-col items-center text-center"
       >
-        <img src="/logo.png" alt={tr("SkyCommunity")} className="h-24 w-24 rounded-full bg-white shadow-[0_0_60px_-10px_#4AA8F0] ring-4 ring-[#4AA8F0]/30" data-testid="login-logo-slot" />
-        <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">{tr("SkyCommunity")}{" "}<span className="text-[#4AA8F0]">{tr("Radar")}</span>
+        <span className="relative inline-flex"><ThemeHat size="lg" /><img src="/logo.png" alt={tr("SkyCommunity")} className="relative z-[1] h-24 w-24 rounded-full bg-white shadow-[0_0_60px_-10px_var(--sc-accent)] ring-4 ring-[color:var(--sc-accent)]/30" data-testid="login-logo-slot" /></span>
+        <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">{tr("SkyCommunity")}{" "}<span className="text-[color:var(--sc-accent)]">{tr("Radar")}</span>
         </h1>
         <p className="mt-3 max-w-xl text-balance text-sm text-muted-foreground sm:text-base">{tr("Le ciel de SkyCommunity, sous vos yeux.")}</p>
+        <ThemeGreeting className="mt-2 text-sm font-semibold text-[color:var(--sc-accent-soft)]" />
 
-        <div className="mt-8 w-full max-w-sm space-y-3 rounded-2xl border border-white/10 bg-[#0A1222]/80 p-6 shadow-2xl backdrop-blur-md">
+        <div className="relative mt-8 w-full max-w-sm space-y-3 overflow-hidden rounded-2xl border border-white/10 bg-[color:var(--sc-sidebar)]/80 p-6 shadow-2xl backdrop-blur-md">
+          <ThemeGarland className="absolute inset-x-0 top-0 h-[22px]" />
           <h2 className="text-lg font-semibold">{tr("Connexion")}</h2>
           <p className="text-xs text-muted-foreground">{tr("Vos accès (Pilote, ATC, administration) suivent automatiquement vos rôles sur le serveur Discord SkyCommunity.")}</p>
           <button
@@ -90,7 +93,7 @@ export default function Login() {
             href="https://discord.gg/xjhTqW3N7d"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block text-xs text-[#7CC0F5] underline-offset-4 hover:underline"
+            className="inline-block text-xs text-[color:var(--sc-accent-soft)] underline-offset-4 hover:underline"
             data-testid="discord-button"
           >{tr("Pas encore membre ? Rejoindre le Discord SkyCommunity")}</a>
         </div>
@@ -114,7 +117,7 @@ export default function Login() {
               transition={{ delay: 0.15 + i * 0.08, duration: 0.35 }}
               className="rounded-xl border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm"
             >
-              <Icon className="mx-auto h-6 w-6 text-[#4AA8F0]" />
+              <Icon className="mx-auto h-6 w-6 text-[color:var(--sc-accent)]" />
               <div className="mt-2 text-sm font-semibold">{tr(title)}</div>
               <p className="mt-1 text-xs text-muted-foreground">{tr(text)}</p>
             </motion.div>

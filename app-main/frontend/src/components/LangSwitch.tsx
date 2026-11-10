@@ -12,7 +12,7 @@ export default function LangSwitch({ className }: { className?: string }) {
           role="radio"
           aria-checked={lang === l}
           onClick={() => void setLang(l)}
-          className={cn("rounded px-1.5 py-0.5 uppercase transition-colors", lang === l ? "bg-[#2B63C9] text-white" : "text-muted-foreground hover:text-foreground")}
+          className={cn("rounded px-1.5 py-0.5 uppercase transition-colors", lang === l ? "bg-[color:var(--sc-primary)] text-white" : "text-muted-foreground hover:text-foreground")}
           title={l === "fr" ? "Français" : "English"}
           data-testid={`lang-${l}`}
         >

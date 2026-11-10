@@ -67,7 +67,7 @@ function StepButton({ dir, to, onClick, disabled }: { dir: "prev" | "next"; to: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "group flex min-w-0 items-center gap-2 rounded-lg border border-border/70 bg-background/30 px-2.5 py-1.5 transition-colors hover:border-[#4AA8F0]/50 hover:bg-[#2B63C9]/10 disabled:opacity-50",
+        "group flex min-w-0 items-center gap-2 rounded-lg border border-border/70 bg-background/30 px-2.5 py-1.5 transition-colors hover:border-[color:var(--sc-accent)]/50 hover:bg-[color:var(--sc-primary)]/10 disabled:opacity-50",
         prev ? "text-left" : "flex-row-reverse text-right",
       )}
       data-testid={`step-${dir}`}
@@ -118,7 +118,7 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.16 }}
-            className={cn("space-y-3 rounded-xl border p-4", pending.danger ? "border-red-500/50 bg-red-500/8" : "border-[#4AA8F0]/50 bg-[#4AA8F0]/8")}
+            className={cn("space-y-3 rounded-xl border p-4", pending.danger ? "border-red-500/50 bg-red-500/8" : "border-[color:var(--sc-accent)]/50 bg-[color:var(--sc-accent)]/8")}
             data-testid="confirm-dialog"
           >
             <p className="text-sm font-semibold">{tr("Confirmer : {0}", [pending.label])}</p>
@@ -191,7 +191,7 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="space-y-2 rounded-xl border border-[#4AA8F0]/50 bg-[#4AA8F0]/8 p-4"
+            className="space-y-2 rounded-xl border border-[color:var(--sc-accent)]/50 bg-[color:var(--sc-accent)]/8 p-4"
             data-testid="pushback-click"
           >
             <p className="text-sm font-semibold">{tr("Repoussage, nez vers le {0}", [ed.pushLabel?.toLowerCase()])}</p>
@@ -212,7 +212,7 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.16 }}
-            className="space-y-3 rounded-xl border border-[#4AA8F0]/50 bg-[#4AA8F0]/8 p-4"
+            className="space-y-3 rounded-xl border border-[color:var(--sc-accent)]/50 bg-[color:var(--sc-accent)]/8 p-4"
             data-testid="pushback-picker"
           >
             <p className="text-sm font-semibold">{tr("Repoussage : 1. le nez de l'avion finit vers…")}</p>
@@ -285,8 +285,8 @@ export default function FlightActions({ flight, ed, part }: { flight: FlightDeta
                       className={cn(
                         "flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50",
                         i === 0
-                          ? "bg-[#2B63C9] text-white shadow-[#2B63C9]/30 hover:bg-[#3572DB]"
-                          : "border border-[#2B63C9]/50 bg-[#2B63C9]/10 text-[#9CCBF5] hover:bg-[#2B63C9]/20",
+                          ? "bg-[color:var(--sc-primary)] text-white shadow-[color:var(--sc-primary)]/30 hover:bg-[color:var(--sc-primary-hover)]"
+                          : "border border-[color:var(--sc-primary)]/50 bg-[color:var(--sc-primary)]/10 text-[color:var(--sc-accent-softer)] hover:bg-[color:var(--sc-primary)]/20",
                         progress.length % 2 === 1 && i === 0 && progress.length > 1 && "col-span-2",
                       )}
                       data-testid={`action-${a.code}`}

@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { labels, locale, tr } from "@/lib/i18n";
 import { DONATE_URL } from "@/lib/siteConfig";
-import { ThemeBadge } from "@/components/ThemeDecor";
+import { ThemeGarland, ThemeHat, ThemeScene } from "@/components/ThemeDecor";
 import { ReviewPrompt, reviewKey } from "@/components/Reviews";
 export const DISCORD_INVITE = "https://discord.gg/xjhTqW3N7d";
 const SIDEBAR_KEY = "sc.sidebar.collapsed";
@@ -42,12 +42,12 @@ function UtcClock() {
   }, []);
   const online = q.isSuccess;
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2 py-1 font-mono text-xs sm:gap-2 sm:px-2.5 sm:text-sm" data-testid="utc-clock">
+    <div className="flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-1.5 py-1 font-mono text-xs sm:gap-2 sm:px-2.5 sm:text-sm" data-testid="utc-clock" title="UTC">
       <span className={cn("h-2 w-2 rounded-full sync-dot", online ? "bg-emerald-400" : "bg-red-400")} data-testid="sync-status" data-online={online} title={online ? tr("Synchronisé") : tr("Hors ligne — reconnexion…")} />
       <span className="tabular-nums tracking-wider" data-testid="server-time">
         {new Date(now + offset).toISOString().slice(11, 19)}
       </span>
-      <span className="text-[10px] text-muted-foreground sm:text-[11px]">{tr("UTC")}</span>
+      <span className="hidden text-[10px] text-muted-foreground sm:inline sm:text-[11px]">{tr("UTC")}</span>
     </div>
   );
 }
@@ -112,13 +112,13 @@ function ModeSwitch({ user, mode }: { user: User; mode: UiMode }) {
           onClick={() => pick(m)}
           disabled={busy}
           className={cn(
-            "relative z-10 flex items-center gap-1 rounded-md px-2.5 py-1 font-semibold transition-colors duration-200 sm:px-3",
+            "relative z-10 flex items-center gap-1 rounded-md px-2 py-1 font-semibold transition-colors duration-200 sm:px-3",
             mode === m ? "text-white" : "text-muted-foreground hover:text-foreground",
           )}
           data-testid={`mode-switch-${m}`}
         >
           {mode === m && (
-            <motion.span layoutId="mode-pill" className="absolute inset-0 -z-10 rounded-md bg-[#2B63C9]" transition={{ type: "spring", stiffness: 500, damping: 38 }} />
+            <motion.span layoutId="mode-pill" className="absolute inset-0 -z-10 rounded-md bg-[color:var(--sc-primary)]" transition={{ type: "spring", stiffness: 500, damping: 38 }} />
           )}
           {m === "pilote" ? tr("Pilote") : "ATC"}
           {((m === "atc" && !canAtc) || (m === "pilote" && !canPilot)) && <Lock className="h-3 w-3" />}
@@ -187,13 +187,13 @@ function NotifBell({ user }: { user: User }) {
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-[#070D1A]" data-testid="notif-unread">
+          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-[color:var(--sc-topbar)]" data-testid="notif-unread">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-lg border border-border bg-[#0B1220] p-2 shadow-xl">
+        <div className="absolute right-0 z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-lg border border-border bg-[color:var(--sc-panel)] p-2 shadow-xl">
           {count === 0 ? (
             <p className="p-2 text-xs text-muted-foreground">{tr("Aucune notification")}</p>
           ) : (
@@ -218,16 +218,16 @@ function NotifBell({ user }: { user: User }) {
                     className="block w-full border-b border-border/50 px-2 py-1.5 text-left text-xs last:border-0 hover:bg-secondary/60"
                     data-testid="notif-review"
                   >
-                    <p className="flex items-center gap-1.5 font-semibold text-[#9CCBF5]">
+                    <p className="flex items-center gap-1.5 font-semibold text-[color:var(--sc-accent-softer)]">
                       {it.title}
                       {it.unread && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500" />}
                     </p>
                     <p className="text-muted-foreground">{it.body}</p>
-                    <p className="mt-0.5 text-[11px] font-semibold text-[#4AA8F0]">{tr("Cliquer pour donner l'avis")}</p>
+                    <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--sc-accent)]">{tr("Cliquer pour donner l'avis")}</p>
                   </button>
                 ) : (
                 <div key={it.id} className="border-b border-border/50 px-2 py-1.5 text-xs last:border-0">
-                  <p className="flex items-center gap-1.5 font-semibold text-[#9CCBF5]">
+                  <p className="flex items-center gap-1.5 font-semibold text-[color:var(--sc-accent-softer)]">
                     {it.title}
                     {it.unread && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500" />}
                   </p>
@@ -245,14 +245,16 @@ function NotifBell({ user }: { user: User }) {
 
 function TopBar({ user, mode }: { user: User | undefined; mode: UiMode }) {
   return (
-    <header className="z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-[#070D1A]/95 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-md sm:gap-3" data-testid="top-bar">
+    <header className="relative z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-[color:var(--sc-topbar)]/95 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-md sm:gap-3" data-testid="top-bar">
       <Link to="/" className="flex shrink-0 items-center gap-2.5" data-testid="brand-link">
-        <img src="/logo.png" alt={tr("SkyCommunity")} className="h-8 w-8 rounded-full bg-white ring-2 ring-[#4AA8F0]/40 sm:h-9 sm:w-9" data-testid="logo-slot" />
-        <span className="hidden whitespace-nowrap text-base font-bold tracking-tight sm:inline">{tr("SkyCommunity")}{" "}<span className="text-[#4AA8F0]">{tr("Radar")}</span>
-          <ThemeBadge />
+        <span className="relative inline-flex">
+          <ThemeHat />
+          <img src="/logo.png" alt={tr("SkyCommunity")} className="relative z-[1] h-8 w-8 rounded-full bg-white ring-2 ring-[color:var(--sc-accent)]/40 sm:h-9 sm:w-9" data-testid="logo-slot" />
+        </span>
+        <span className="hidden whitespace-nowrap text-base font-bold tracking-tight sm:inline">{tr("SkyCommunity")}{" "}<span className="text-[color:var(--sc-accent)]">{tr("Radar")}</span>
         </span>
       </Link>
-      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-3">
+      <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2 lg:gap-3">
         <UtcClock />
         <LangSwitch className="hidden sm:flex" />
         {user && <ModeSwitch user={user} mode={mode} />}
@@ -260,13 +262,13 @@ function TopBar({ user, mode }: { user: User | undefined; mode: UiMode }) {
           href={DONATE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-pink-600 to-rose-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-[transform,filter] duration-150 hover:-translate-y-0.5 hover:brightness-110 sm:px-3 sm:text-sm"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-gradient-to-r from-pink-600 to-rose-500 p-2 text-xs font-semibold text-white shadow-sm transition-[transform,filter] duration-150 hover:-translate-y-0.5 hover:brightness-110 lg:px-3 lg:py-1.5 lg:text-sm"
           title={tr("Soutenir le projet")}
+          aria-label={tr("Soutenir le projet")}
           data-testid="header-donate-link"
         >
           <Heart className="h-4 w-4 fill-white/90" />
-          <span className="sm:hidden">{tr("Soutenir")}</span>
-          <span className="hidden sm:inline">{tr("Soutenir le projet")}</span>
+          <span className="hidden lg:inline">{tr("Soutenir le projet")}</span>
         </a>
         <a
           href={DISCORD_INVITE}
@@ -279,7 +281,7 @@ function TopBar({ user, mode }: { user: User | undefined; mode: UiMode }) {
           <DiscordIcon className="h-5 w-5" />
         </a>
         {user && (
-          <Link to="/profile" className="hidden items-center gap-2 md:flex" title={tr("Mon profil")} data-testid="current-user">
+          <Link to="/profile" className="hidden items-center gap-2 lg:flex" title={tr("Mon profil")} data-testid="current-user">
             {user.avatar_url ? (
               <img src={user.avatar_url} alt="" className="h-8 w-8 rounded-full ring-1 ring-border" />
             ) : (
@@ -290,6 +292,7 @@ function TopBar({ user, mode }: { user: User | undefined; mode: UiMode }) {
         {user && <NotifBell user={user} />}
         <LogoutButton />
       </div>
+      <ThemeGarland className="absolute inset-x-0 top-full z-50 h-[36px]" />
     </header>
   );
 }
@@ -362,7 +365,10 @@ function usePlanningPending(user: User) {
 function Sidebar({ user, mode }: { user: User; mode: UiMode }) {
   const pending = usePlanningPending(user);
   const suivi = useActivityPending(user);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === "1");
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    return saved === null ? window.innerWidth < 1100 : saved === "1";
+  });
   const toggle = () =>
     setCollapsed((c) => {
       localStorage.setItem(SIDEBAR_KEY, c ? "0" : "1");
@@ -373,7 +379,7 @@ function Sidebar({ user, mode }: { user: User; mode: UiMode }) {
       initial={false}
       animate={{ width: collapsed ? 64 : 224 }}
       transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-      className="relative z-30 hidden shrink-0 flex-col border-r border-border bg-[#0A1222] md:flex"
+      className="relative z-30 hidden shrink-0 flex-col border-r border-border bg-[color:var(--sc-sidebar)] md:flex"
       data-testid="sidebar"
       data-collapsed={collapsed}
     >
@@ -388,7 +394,7 @@ function Sidebar({ user, mode }: { user: User; mode: UiMode }) {
             className={({ isActive }) =>
               cn(
                 "group relative flex h-11 items-center gap-3 overflow-hidden rounded-lg px-3 text-[15px] font-medium transition-[background-color,color] duration-150",
-                isActive ? "bg-[#2B63C9]/20 text-[#4AA8F0]" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                isActive ? "bg-[color:var(--sc-primary)]/20 text-[color:var(--sc-accent)]" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
               )
             }
           >
@@ -420,6 +426,7 @@ function Sidebar({ user, mode }: { user: User; mode: UiMode }) {
           </NavLink>
         ))}
       </div>
+      <ThemeScene />
       <button
         onClick={toggle}
         className="m-2.5 flex h-10 items-center justify-center gap-2 rounded-lg border border-border text-sm text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground"
@@ -433,20 +440,21 @@ function Sidebar({ user, mode }: { user: User; mode: UiMode }) {
 }
 
 /** Mobile: bottom tab bar with the same entries (short labels; leaves room for the iPhone home bar). */
-const SHORT: Record<string, string> = labels({ radar: "Radar", "new-flight": "Nouveau", history: "Historique", planning: "Planning", ranking: "Classement", profile: "Profil", admin: "Admin", suivi: "Suivi" });
+const SHORT: Record<string, string> = labels({ radar: "Radar", "new-flight": "Nouveau", history: "Historique", signalements: "Signaler", planning: "Planning", ranking: "Podium", profile: "Profil", admin: "Admin", suivi: "Suivi" });
 function MobileNav({ user, mode }: { user: User; mode: UiMode }) {
+  const items = navItems(user, mode);
   const pending = usePlanningPending(user);
   const suivi = useActivityPending(user);
   return (
-    <nav className="flex shrink-0 justify-around border-t border-border bg-[#0A1222] pb-[env(safe-area-inset-bottom)] md:hidden" data-testid="mobile-nav">
-      {navItems(user, mode).map(({ to, label, icon: Icon, id }) => (
+    <nav className="flex shrink-0 justify-around border-t border-border bg-[color:var(--sc-sidebar)] pb-[env(safe-area-inset-bottom)] md:hidden" data-testid="mobile-nav">
+      {items.map(({ to, label, icon: Icon, id }) => (
         <NavLink
           key={to}
           to={to}
           end={to === "/"}
           data-testid={`mobile-nav-${id}`}
           className={({ isActive }) =>
-            cn("relative flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[10px] leading-tight", isActive ? "text-[#4AA8F0]" : "text-muted-foreground")
+            cn("relative flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 leading-tight tracking-tight", items.length > 6 ? "text-[9px]" : "text-[10px]", isActive ? "text-[color:var(--sc-accent)]" : "text-muted-foreground")
           }
         >
           <Icon className="h-5 w-5" />
@@ -488,6 +496,7 @@ export default function AppShell({ children }: { children: (user: User, mode: Ui
           )}
         </motion.main>
       </div>
+      {me.data && <div className="md:hidden" aria-hidden><div className="theme-stripe" /></div>}
       {me.data && <MobileNav user={me.data} mode={mode} />}
       {(me.data?.role === "atc" || me.data?.role === "admin") && <HandoverNotice />}
       {me.data && <ReviewPrompt />}{/* role « aucun » was already sent to /mode above */}

@@ -33,7 +33,7 @@ export default function FlightStrip({ flight: f }: { flight: FlightDetail }) {
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-mono text-2xl font-bold leading-none tracking-tight text-[#4AA8F0]" data-testid="detail-callsign">
+          <div className="font-mono text-2xl font-bold leading-none tracking-tight text-[color:var(--sc-accent)]" data-testid="detail-callsign">
             {f.callsign}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">{tr("Appareil")}{" "}<span className="font-mono">{aircraftName(f.aircraft_type)}</span>

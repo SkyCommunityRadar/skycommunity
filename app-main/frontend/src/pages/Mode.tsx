@@ -49,7 +49,7 @@ function Suspended({ mode, st, onSent }: { mode: M; st: InactivityStatus; onSent
             onChange={(e) => setMsg(e.target.value)}
             maxLength={300}
             placeholder={tr("Un petit mot pour le responsable (facultatif)")}
-            className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs outline-none focus:border-[#4AA8F0]"
+            className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs outline-none focus:border-[color:var(--sc-accent)]"
             data-testid={`mode-${mode}-request-message`}
           />
           <button
@@ -120,11 +120,11 @@ export default function Mode() {
   ];
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center bg-[radial-gradient(circle_at_30%_20%,#10244a_0%,#070D1A_55%)] p-6">
+    <div className="relative flex min-h-dvh items-center justify-center bg-[radial-gradient(circle_at_30%_20%,var(--sc-glow)_0%,var(--sc-topbar)_55%)] p-6">
       <LangSwitch className="absolute right-4 top-4" />
       <div className="w-full max-w-3xl space-y-8">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt={tr("SkyCommunity")} className="h-12 w-12 shrink-0 rounded-full bg-white ring-2 ring-[#4AA8F0]/40" />
+          <img src="/logo.png" alt={tr("SkyCommunity")} className="h-12 w-12 shrink-0 rounded-full bg-white ring-2 ring-[color:var(--sc-accent)]/40" />
           <div>
             <h1 className="text-2xl font-semibold tracking-tight" data-testid="mode-title">{tr("Bonjour {0}, quel poste aujourd'hui ?", [u.display_name])}</h1>
             <p className="text-sm text-muted-foreground">{tr("Vous pourrez changer de mode à tout moment depuis l'en-tête.")}</p>
@@ -149,12 +149,12 @@ export default function Mode() {
                   "group relative overflow-hidden rounded-xl border p-6 text-left transition-[transform,border-color,box-shadow] duration-200",
                   locked
                     ? "cursor-not-allowed border-border bg-card/60"
-                    : "cursor-pointer border-[#2B63C9]/50 bg-card hover:-translate-y-1 hover:border-[#4AA8F0] hover:shadow-[0_12px_40px_-12px_#2B63C9]",
+                    : "cursor-pointer border-[color:var(--sc-primary)]/50 bg-card hover:-translate-y-1 hover:border-[color:var(--sc-accent)] hover:shadow-[0_12px_40px_-12px_var(--sc-primary)]",
                 )}
               >
-                <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[#2B63C9]/15 blur-2xl" />
+                <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[color:var(--sc-primary)]/15 blur-2xl" />
                 <div className={cn(locked && "opacity-55")}>
-                  <Icon className="h-9 w-9 text-[#4AA8F0]" />
+                  <Icon className="h-9 w-9 text-[color:var(--sc-accent)]" />
                   <div className="mt-4 flex items-center gap-2 text-xl font-semibold">
                     {title} {noRole && <Lock className="h-4 w-4 text-muted-foreground" />}
                     {suspended && <Moon className="h-4 w-4 text-amber-300" />}
@@ -168,7 +168,7 @@ export default function Mode() {
                   </div>
                 )}
                 {suspended && st && <Suspended mode={mode} st={st} onSent={(nu) => qc.setQueryData(["me"], nu)} />}
-                {busy === mode && <p className="mt-3 text-xs text-[#4AA8F0]">{tr("Activation…")}</p>}
+                {busy === mode && <p className="mt-3 text-xs text-[color:var(--sc-accent)]">{tr("Activation…")}</p>}
               </div>
             );
           })}

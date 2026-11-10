@@ -45,7 +45,7 @@ const Signalements = lazy(pages.Signalements);
 function PageLoading() {
   return (
     <div className="flex h-dvh items-center justify-center bg-background" data-testid="page-loading">
-      <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#4AA8F0] border-t-transparent" />
+      <span className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--sc-accent)] border-t-transparent" />
     </div>
   );
 }

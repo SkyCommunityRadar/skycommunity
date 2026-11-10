@@ -28,7 +28,7 @@ function Card({ icon: Icon, title, children, testId }: { icon: typeof Gauge; tit
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-background/40" data-testid={testId}>
       <header className="flex items-center gap-2 border-b border-border bg-card/60 px-3 py-2">
-        <Icon className="h-4 w-4 text-[#4AA8F0]" />
+        <Icon className="h-4 w-4 text-[color:var(--sc-accent)]" />
         <span className="text-sm font-semibold">{title}</span>
       </header>
       <div className="space-y-3 p-3">{children}</div>
@@ -70,7 +70,7 @@ export default function FlightPanel({
     <div className="flex min-h-full flex-col" data-testid="selected-flight-panel">
       <div className="space-y-3 p-4 pb-0">
         <div className="flex items-center justify-between gap-2">
-          <Link to={`/pilotes/${f.pilot_id}`} className="text-sm text-muted-foreground hover:text-[#4AA8F0]" data-testid="selected-pilot-link">{tr("Pilote :")}{" "}<span className="font-semibold text-foreground underline-offset-2 hover:underline">{f.pilot_name}</span>
+          <Link to={`/pilotes/${f.pilot_id}`} className="text-sm text-muted-foreground hover:text-[color:var(--sc-accent)]" data-testid="selected-pilot-link">{tr("Pilote :")}{" "}<span className="font-semibold text-foreground underline-offset-2 hover:underline">{f.pilot_name}</span>
           </Link>
           <div className="flex items-center gap-1.5">
             <span
@@ -102,13 +102,13 @@ export default function FlightPanel({
               onClick={() => setTab(k)}
               className={cn(
                 "relative flex-1 px-2 py-3 text-sm font-medium transition-colors",
-                active === k ? "text-[#7CC0F5]" : "text-muted-foreground hover:text-foreground",
+                active === k ? "text-[color:var(--sc-accent-soft)]" : "text-muted-foreground hover:text-foreground",
               )}
               data-testid={`tab-${k === "details" ? "details" : k === "taxi" ? "taxi" : k}`}
             >
               {label}
               {active === k && (
-                <motion.span layoutId={`flight-tab-${fullPage ? "page" : "radar"}`} className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[#4AA8F0]" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
+                <motion.span layoutId={`flight-tab-${fullPage ? "page" : "radar"}`} className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[color:var(--sc-accent)]" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
               )}
             </button>
           ))}

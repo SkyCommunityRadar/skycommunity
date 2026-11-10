@@ -31,8 +31,9 @@ function DetailView({ id }: { id: string; user: User }) {
   const grounds = [dep.data, arr.data].filter((g) => !!g).map((g) => g!);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-      <aside className="order-2 w-full shrink-0 border-r border-border bg-card md:order-none md:w-[28rem] md:overflow-y-auto" data-testid="flight-detail-panel">
+    <div className="flex h-full flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <aside className="order-2 w-full shrink-0 border-r border-border bg-card lg:order-none lg:w-[28rem] lg:overflow-y-auto" data-testid="flight-detail-panel">
+        <div className="theme-stripe" aria-hidden />
         <div className="flex items-center justify-between gap-2 px-4 pt-3">
           <Link to={`/?f=${f.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" data-testid="back-to-radar">
             <ArrowLeft className="h-3.5 w-3.5" />{" "}{tr("Radar")}</Link>
@@ -42,7 +43,7 @@ function DetailView({ id }: { id: string; user: User }) {
         </div>
         <FlightPanel flight={f} ed={ed} fullPage />
       </aside>
-      <section className="relative order-1 h-[50vh] shrink-0 md:order-none md:h-auto md:flex-1 md:shrink">
+      <section className="relative order-1 h-[50vh] shrink-0 lg:order-none lg:h-auto lg:flex-1 lg:shrink">
         <RadarMap
           testId="detail-map"
           flights={[f]}
@@ -72,7 +73,7 @@ function DetailView({ id }: { id: string; user: User }) {
         {/* moving the map by hand stops the following; « Centrer sur l'avion » brings it back */}
         <button
           onClick={() => setFollow(!follow)}
-          className={`absolute bottom-6 right-3 z-[500] inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium backdrop-blur transition-colors duration-150 ${follow ? "border-[#4AA8F0]/60 bg-[#2B63C9]/30 text-[#7CC0F5]" : "border-border bg-background/90 text-foreground hover:border-[#4AA8F0]/60 hover:text-[#7CC0F5]"}`}
+          className={`absolute bottom-6 right-3 z-[500] inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium backdrop-blur transition-colors duration-150 ${follow ? "border-[color:var(--sc-accent)]/60 bg-[color:var(--sc-primary)]/30 text-[color:var(--sc-accent-soft)]" : "border-border bg-background/90 text-foreground hover:border-[color:var(--sc-accent)]/60 hover:text-[color:var(--sc-accent-soft)]"}`}
           title={follow ? tr("Cliquer pour arrêter de suivre l'avion") : undefined}
           data-testid="follow-toggle"
         >
@@ -80,7 +81,7 @@ function DetailView({ id }: { id: string; user: User }) {
           {follow ? tr("Suivi de l'avion") : tr("Centrer sur l'avion")}
         </button>
         {ed.banner && (
-          <div className="absolute right-3 top-3 z-[500] rounded-lg border border-[#4AA8F0]/50 bg-background/90 px-3 py-1.5 text-xs text-[#7CC0F5]" data-testid="map-mode-banner">
+          <div className="absolute right-3 top-3 z-[500] rounded-lg border border-[color:var(--sc-accent)]/50 bg-background/90 px-3 py-1.5 text-xs text-[color:var(--sc-accent-soft)]" data-testid="map-mode-banner">
             {ed.banner}
           </div>
         )}

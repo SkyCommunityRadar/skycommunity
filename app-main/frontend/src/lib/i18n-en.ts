@@ -1,6 +1,19 @@
 // English translation of the interface — downloaded only by someone who picks English (lib/i18n.ts).
 // Key = the French text written in the code. Generated from the code, then checked by hand.
 export const EN: Record<string, string> = {
+  "Podium": "Ranking",
+  "Signaler": "Report",
+  "Aperçu du thème {0} : visible seulement dans cet onglet": "Preview of the {0} theme: shown in this tab only",
+  "Quitter l'aperçu": "Leave preview",
+  "Aperçu": "Preview",
+  "Activer pour tous": "Apply for everyone",
+  "« Aperçu » : essayez un thème, visible seulement dans cet onglet. « Activer pour tous » : tous les membres le voient, page de connexion comprise, dans les 5 minutes (tout de suite en rechargeant la page).": "« Preview »: try a theme, shown in this tab only. « Apply for everyone »: every member sees it, login page included, within 5 minutes (at once after a reload).",
+  "Joyeuses fêtes de fin d'année !": "Happy holidays!",
+  "Joyeux Halloween !": "Happy Halloween!",
+  "Joyeuses Pâques !": "Happy Easter!",
+  "Rouge, vert et or, guirlande lumineuse, bonnet de Noël sur le logo.": "Red, green and gold, string lights, Santa hat on the logo.",
+  "Orange et violet, sang qui coule sous les menus, chapeau de sorcière.": "Orange and purple, blood dripping under the menus, witch hat.",
+  "Couleurs pastel, guirlande d'œufs, oreilles de lapin sur le logo.": "Pastel colours, egg bunting, bunny ears on the logo.",
   "Avis reporté : retrouvez-le dans la cloche des notifications jusqu'au {0}.": "Review postponed: find it in the notification bell until {0}.",
   "Aucun avis laissé pour ce vol.": "No review left for this flight.",
   "Ne laisser aucun avis pour ce vol ? Ce n'est plus possible ensuite.": "Leave no review for this flight? It cannot be given afterwards.",

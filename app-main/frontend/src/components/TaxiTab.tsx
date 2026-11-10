@@ -15,7 +15,7 @@ function Card({ icon: Icon, title, icao, children, testId }: { icon: typeof Plan
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-background/40" data-testid={testId}>
       <header className="flex items-center gap-2 border-b border-border bg-card/60 px-3 py-2">
-        <Icon className="h-4 w-4 text-[#4AA8F0]" />
+        <Icon className="h-4 w-4 text-[color:var(--sc-accent)]" />
         <span className="text-sm font-semibold">{title}</span>
         <span className="ml-auto rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{icao}</span>
       </header>
@@ -38,7 +38,7 @@ const Pill = ({ children, tone = "route" }: { children: ReactNode; tone?: "route
   <span
     className={cn(
       "inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold",
-      tone === "route" && "bg-[#2B63C9]/15 text-[#7CC0F5]",
+      tone === "route" && "bg-[color:var(--sc-primary)]/15 text-[color:var(--sc-accent-soft)]",
       tone === "stand" && "bg-secondary text-foreground",
       tone === "hold" && "bg-emerald-500/15 text-emerald-300",
     )}

@@ -34,7 +34,7 @@ export default function HoldingPicker({ flight, onPickHolding, pickingHolding }:
                     <MapPin className="h-4 w-4" /> {pickingHolding ? tr("Cliquez sur la carte…") : flight.holding_point ? tr("Changer") : tr("Choisir sur la carte")}
                   </Button>
                 ) : (
-                  <Link to={`/flights/${flight.id}?pick=holding`} className="inline-flex items-center gap-1 text-xs text-[#4AA8F0] hover:underline" data-testid="holding-open-detail">
+                  <Link to={`/flights/${flight.id}?pick=holding`} className="inline-flex items-center gap-1 text-xs text-[color:var(--sc-accent)] hover:underline" data-testid="holding-open-detail">
                     <MapPin className="h-3.5 w-3.5" />{" "}{tr("Choisir sur la carte")}</Link>
                 )}
               </div>

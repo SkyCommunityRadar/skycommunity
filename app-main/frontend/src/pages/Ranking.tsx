@@ -20,18 +20,18 @@ function Board({ rows, kind }: { rows: LeaderEntry[]; kind: string }) {
       {rows.map((r) => (
         <li
           key={`${r.rank}-${r.name}`}
-          className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 transition-[border-color,transform] duration-150 hover:-translate-y-0.5 hover:border-[#4AA8F0]/50 sm:gap-3 sm:px-4 sm:py-3"
+          className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 transition-[border-color,transform] duration-150 hover:-translate-y-0.5 hover:border-[color:var(--sc-accent)]/50 sm:gap-3 sm:px-4 sm:py-3"
           data-testid={`leader-${kind}-row-${r.rank}`}
         >
-          <span className={`w-7 shrink-0 font-mono text-base font-bold sm:w-8 sm:text-lg ${r.rank <= 3 ? "text-[#4AA8F0]" : "text-muted-foreground"}`}>#{r.rank}</span>
+          <span className={`w-7 shrink-0 font-mono text-base font-bold sm:w-8 sm:text-lg ${r.rank <= 3 ? "text-[color:var(--sc-accent)]" : "text-muted-foreground"}`}>#{r.rank}</span>
           <div className="min-w-0 flex-1">
-            <Link to={r.user_id ? `/pilotes/${r.user_id}` : "#"} className="flex min-w-0 items-center gap-2 text-[15px] font-semibold hover:text-[#4AA8F0] sm:text-base" data-testid={`leader-${kind}-name-${r.rank}`}>
+            <Link to={r.user_id ? `/pilotes/${r.user_id}` : "#"} className="flex min-w-0 items-center gap-2 text-[15px] font-semibold hover:text-[color:var(--sc-accent)] sm:text-base" data-testid={`leader-${kind}-name-${r.rank}`}>
               {r.avatar_url && <img src={r.avatar_url} alt="" className="h-6 w-6 shrink-0 rounded-full" />}
               <span className="truncate">{r.name}</span>
             </Link>
             <div className="flex flex-wrap items-center gap-0.5">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className={`h-3.5 w-3.5 ${i < r.stars ? "fill-[#4AA8F0] text-[#4AA8F0]" : "text-border"}`} />
+                <Star key={i} className={`h-3.5 w-3.5 ${i < r.stars ? "fill-[color:var(--sc-accent)] text-[color:var(--sc-accent)]" : "text-border"}`} />
               ))}
               {r.level && <span className="ml-1.5 whitespace-nowrap text-[10px] text-muted-foreground">{r.level}</span>}
             </div>
@@ -39,7 +39,7 @@ function Board({ rows, kind }: { rows: LeaderEntry[]; kind: string }) {
           <div className="shrink-0 text-right font-mono text-xs sm:text-sm">
             <div className="whitespace-nowrap">{r.hours.toFixed(1)}{" "}{tr("h")}{kind === "pilots" ? tr(" · {0} vols", [r.flights]) : ""}</div>
             <div className="whitespace-nowrap text-[11px] text-muted-foreground sm:text-xs">
-              {r.rating != null ? `★ ${r.rating.toFixed(1)} (${r.reviews})` : tr("pas d'avis")} · <span className="text-[#4AA8F0]" data-testid={`leader-${kind}-score-${r.rank}`}>{tr("{0} pts", [r.score])}</span>
+              {r.rating != null ? `★ ${r.rating.toFixed(1)} (${r.reviews})` : tr("pas d'avis")} · <span className="text-[color:var(--sc-accent)]" data-testid={`leader-${kind}-score-${r.rank}`}>{tr("{0} pts", [r.score])}</span>
             </div>
           </div>
         </li>

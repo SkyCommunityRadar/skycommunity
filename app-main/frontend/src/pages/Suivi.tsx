@@ -134,14 +134,14 @@ function MemberCard({ kind, m }: { kind: Kind; m: MemberActivity }) {
   return (
     <li className={cn("rounded-lg border bg-card p-3 text-sm", st.request_at ? "border-amber-500/50" : "border-border")} data-testid={`member-${m.id}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <Link to={`/pilotes/${m.id}`} className="flex min-w-0 items-center gap-2 font-semibold hover:text-[#4AA8F0]">
+        <Link to={`/pilotes/${m.id}`} className="flex min-w-0 items-center gap-2 font-semibold hover:text-[color:var(--sc-accent)]">
           {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-7 w-7 shrink-0 rounded-full" /> : (
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs">{m.display_name.slice(0, 1).toUpperCase()}</span>
           )}
           <span className="truncate">{m.display_name}</span>
         </Link>
         {m.badges.map((b) => (
-          <span key={b} className="rounded bg-[#2B63C9]/20 px-1.5 py-0.5 text-[10px] text-[#7CC0F5]">{b}</span>
+          <span key={b} className="rounded bg-[color:var(--sc-primary)]/20 px-1.5 py-0.5 text-[10px] text-[color:var(--sc-accent-soft)]">{b}</span>
         ))}
         <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1", cls)} data-testid={`member-${m.id}-state`}>{label}</span>
         <span className="ml-auto text-xs text-muted-foreground">{tr("Dernière activité :")}{" "}<b className="text-foreground">{ago(st)}</b>
@@ -271,7 +271,7 @@ function Side({ kind, s, user }: { kind: Kind; s: ActivitySettings; user: User }
         {FILTERS.map(([f, label]) => (
           <button key={f} onClick={() => setFilter(f)} data-testid={`filter-${kind}-${f}`}
             className={cn("rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-              filter === f ? "border-[#4AA8F0] bg-[#2B63C9]/25 text-white" : "border-border text-muted-foreground hover:text-foreground")}>
+              filter === f ? "border-[color:var(--sc-accent)] bg-[color:var(--sc-primary)]/25 text-white" : "border-border text-muted-foreground hover:text-foreground")}>
             {tr(label)} <span className="font-mono opacity-70">{count(f)}</span>
           </button>
         ))}

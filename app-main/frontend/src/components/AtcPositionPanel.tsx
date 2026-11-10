@@ -107,7 +107,7 @@ function OpenForm({ onDone }: { onDone: () => void }) {
             onClick={() => setKind(k)}
             className={cn(
               "flex items-center justify-center gap-1.5 rounded px-2 py-1.5 font-semibold transition-colors",
-              kind === k ? "bg-[#2B63C9] text-white" : "text-muted-foreground hover:text-foreground",
+              kind === k ? "bg-[color:var(--sc-primary)] text-white" : "text-muted-foreground hover:text-foreground",
             )}
             data-testid={`atc-kind-${k}`}
           >
@@ -128,7 +128,7 @@ function OpenForm({ onDone }: { onDone: () => void }) {
             onClick={() => setWhen(k)}
             className={cn(
               "flex items-center justify-center gap-1.5 rounded px-2 py-1.5 font-semibold transition-colors",
-              when === k ? "bg-[#2B63C9] text-white" : "text-muted-foreground hover:text-foreground",
+              when === k ? "bg-[color:var(--sc-primary)] text-white" : "text-muted-foreground hover:text-foreground",
             )}
             data-testid={`atc-when-${k}`}
           >
@@ -157,7 +157,7 @@ function OpenForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setIcao(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
           placeholder={kind === "airport" ? "LFPG" : "LFFF"}
           maxLength={4}
-          className="w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[#4AA8F0]"
+          className="w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-[color:var(--sc-accent)]"
           data-testid="atc-icao-input"
         />
       </label>
@@ -174,7 +174,7 @@ function OpenForm({ onDone }: { onDone: () => void }) {
                   onClick={() => setPosition(p)}
                   className={cn(
                     "rounded border px-2 py-1.5 text-xs font-semibold transition-colors",
-                    position === p ? "border-[#4AA8F0] bg-[#2B63C9]/25 text-white" : "border-border text-muted-foreground hover:text-foreground",
+                    position === p ? "border-[color:var(--sc-accent)] bg-[color:var(--sc-primary)]/25 text-white" : "border-border text-muted-foreground hover:text-foreground",
                   )}
                   data-testid={`atc-position-${p}`}
                 >
@@ -193,7 +193,7 @@ function OpenForm({ onDone }: { onDone: () => void }) {
       {info.data && (
         <div className="space-y-2 rounded border border-border/70 bg-card/60 p-2 text-xs" data-testid="atc-frequency-preview">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="font-mono font-semibold text-[#4AA8F0]">{info.data.icao}_{pos}</span>
+            <span className="font-mono font-semibold text-[color:var(--sc-accent)]">{info.data.icao}_{pos}</span>
             <span className="truncate text-muted-foreground">{info.data.name}</span>
           </div>
           {blocked && (
@@ -225,7 +225,7 @@ function OpenForm({ onDone }: { onDone: () => void }) {
               placeholder="118.650"
               maxLength={7}
               className={cn(
-                "w-24 rounded border bg-background px-1.5 py-1 font-mono text-sm text-amber-200 outline-none focus:border-[#4AA8F0]",
+                "w-24 rounded border bg-background px-1.5 py-1 font-mono text-sm text-amber-200 outline-none focus:border-[color:var(--sc-accent)]",
                 freq && !freqOk ? "border-red-500" : "border-border",
               )}
               data-testid="atc-frequency-input"
@@ -293,7 +293,7 @@ export function PreopeningItem({ p, user, showReason = false }: { p: Preopening;
     <li className="space-y-1 rounded bg-background/60 px-2 py-1 text-xs" data-testid={`atc-preopening-${p.callsign}`}>
       <div className="flex items-center justify-between gap-2 font-mono">
         <span className="min-w-0 truncate">
-          <b className="text-[#4AA8F0]">{p.callsign}</b> <span className="text-amber-200">{p.frequency}</span>
+          <b className="text-[color:var(--sc-accent)]">{p.callsign}</b> <span className="text-amber-200">{p.frequency}</span>
           <span className="ml-1 font-sans text-[10px] text-muted-foreground">{p.controller}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5 font-sans text-[11px]">
@@ -333,7 +333,7 @@ export function PreopeningItem({ p, user, showReason = false }: { p: Preopening;
             onChange={(e) => setText(e.target.value)}
             maxLength={300}
             placeholder={form === "refuse" ? tr("Réponse au contrôleur (facultatif)") : tr("Motif de l'annulation (obligatoire)")}
-            className="w-full rounded border border-border bg-background px-2 py-1 outline-none focus:border-[#4AA8F0]"
+            className="w-full rounded border border-border bg-background px-2 py-1 outline-none focus:border-[color:var(--sc-accent)]"
             data-testid={`atc-preopening-reason-${p.callsign}`}
           />
           <div className="flex gap-1">
@@ -382,12 +382,12 @@ export default function AtcPositionPanel({ user, canOpen: allowed = true }: { us
           return (
             <li
               key={p.id}
-              className={cn("flex items-center justify-between gap-2 rounded px-2 py-1 font-mono", own ? "bg-[#2B63C9]/15 ring-1 ring-[#2B63C9]/40" : "bg-background/60")}
+              className={cn("flex items-center justify-between gap-2 rounded px-2 py-1 font-mono", own ? "bg-[color:var(--sc-primary)]/15 ring-1 ring-[color:var(--sc-primary)]/40" : "bg-background/60")}
               data-testid={`atc-online-${p.callsign}`}
             >
               <span className="min-w-0 truncate">
                 <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 sync-dot" />
-                <b className="text-[#4AA8F0]">{p.callsign}</b> <span className="text-muted-foreground">{TYPE_LABEL[p.type] ?? p.type}</span>
+                <b className="text-[color:var(--sc-accent)]">{p.callsign}</b> <span className="text-muted-foreground">{TYPE_LABEL[p.type] ?? p.type}</span>
                 <span className="ml-1 font-sans text-[10px] text-muted-foreground">{p.controller}</span>
               </span>
               <span className="flex items-center gap-1.5">

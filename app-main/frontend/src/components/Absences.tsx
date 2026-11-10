@@ -66,7 +66,7 @@ export function MyAbsences({ user }: { user: User }) {
   return (
     <div className="space-y-3 rounded border border-border bg-card p-4" data-testid="my-absences">
       <div>
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><Palmtree className="h-4 w-4 text-[#4AA8F0]" />{" "}{tr("Mes absences")}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><Palmtree className="h-4 w-4 text-[color:var(--sc-accent)]" />{" "}{tr("Mes absences")}</h2>
         <p className="text-xs text-muted-foreground">
           {a.atc && !a.pilote
             ? tr("Prévenez quand vous ne pourrez pas contrôler : pendant une absence, la règle d'inactivité est en pause.")
@@ -137,7 +137,7 @@ function LeadRow({ a }: { a: Absence }) {
   return (
     <li className={cn("space-y-1.5 rounded-lg border bg-card p-3 text-sm", a.status === "en_attente" ? "border-amber-500/50" : "border-border")} data-testid={`absence-${a.id}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Link to={`/pilotes/${a.user_id}`} className="flex items-center gap-2 font-semibold hover:text-[#4AA8F0]">
+        <Link to={`/pilotes/${a.user_id}`} className="flex items-center gap-2 font-semibold hover:text-[color:var(--sc-accent)]">
           {a.avatar_url && <img src={a.avatar_url} alt="" className="h-6 w-6 rounded-full" />}
           {a.display_name}
         </Link>
@@ -211,12 +211,12 @@ export function LeadAbsences({ kind }: { kind: "pilote" | "atc" }) {
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4" data-testid={`lead-absences-${kind}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-semibold"><Palmtree className="h-4 w-4 text-[#4AA8F0]" />{" "}{tr("Absences")}</p>
+        <p className="flex items-center gap-2 text-sm font-semibold"><Palmtree className="h-4 w-4 text-[color:var(--sc-accent)]" />{" "}{tr("Absences")}</p>
         <div className="flex flex-wrap gap-1">
           {tabs.map(([k, label]) => (
             <button key={k} onClick={() => setScope(k)} data-testid={`absences-${kind}-${k}`}
               className={cn("rounded-full border px-3 py-1 text-xs font-semibold",
-                scope === k ? "border-[#4AA8F0] bg-[#2B63C9]/25 text-white" : "border-border text-muted-foreground hover:text-foreground")}>
+                scope === k ? "border-[color:var(--sc-accent)] bg-[color:var(--sc-primary)]/25 text-white" : "border-border text-muted-foreground hover:text-foreground")}>
               {label}
             </button>
           ))}

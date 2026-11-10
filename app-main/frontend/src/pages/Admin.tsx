@@ -15,7 +15,7 @@ import { PHASE_LABELS, ROLE_LABELS, fmtDateTime } from "@/lib/phases";
 import type { FlightDetail, FlightEvent, FlightSummary, User } from "@/lib/types";
 
 import { tr } from "@/lib/i18n";
-import { THEMES, useSiteTheme, type SiteTheme } from "@/lib/theme";
+import { THEMES, setThemePreview, useSiteTheme, type SiteTheme } from "@/lib/theme";
 type UserPatch = { disabled?: boolean; ban_hours?: number; ban_reason?: string };
 
 function blockedLabel(u: User): string | null {
@@ -28,7 +28,7 @@ function RoleBadges({ u }: { u: User }) {
   const a = u.access;
   const roles: [boolean, string, string][] = [
     [a.creator, "Créateur", "bg-amber-400/15 text-amber-300"],
-    [a.admin && !a.creator, "Administrateur", "bg-[#2B63C9]/20 text-[#7CC0F5]"],
+    [a.admin && !a.creator, "Administrateur", "bg-[color:var(--sc-primary)]/20 text-[color:var(--sc-accent-soft)]"],
     [a.atc_lead, "Responsable ATC", "bg-violet-500/15 text-violet-300"],
     [a.atc && !a.atc_lead, "ATC", "bg-emerald-500/15 text-emerald-300"],
     [a.pilote, "Pilote", "bg-sky-500/15 text-sky-300"],
@@ -78,7 +78,7 @@ function BulkBar({ count, what, onDelete, pending, onClear, testId }: { count: n
   );
 }
 
-const box = "h-4 w-4 cursor-pointer accent-[#4AA8F0]";
+const box = "h-4 w-4 cursor-pointer accent-[color:var(--sc-accent)]";
 
 function Users({ me }: { me: User }) {
   const qc = useQueryClient();
@@ -364,7 +364,7 @@ function Journal() {
     <div className="flex flex-wrap gap-1.5" data-testid="admin-journal-filters">
       {JOURNAL_TYPES.map(([t, label]) => (
         <button key={t} onClick={() => setType(t)} data-testid={`admin-journal-filter-${t || "tout"}`}
-          className={`rounded-full border px-3 py-1 text-xs font-semibold ${type === t ? "border-[#4AA8F0] bg-[#2B63C9]/25 text-white" : "border-border text-muted-foreground hover:text-foreground"}`}>
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${type === t ? "border-[color:var(--sc-accent)] bg-[color:var(--sc-primary)]/25 text-white" : "border-border text-muted-foreground hover:text-foreground"}`}>
           {tr(label)}
         </button>
       ))}
@@ -373,7 +373,7 @@ function Journal() {
       {(q.data ?? []).map((e) => (
         <li key={e.id} className="flex gap-3 border-b border-border/40 py-1">
           <span className="text-muted-foreground w-36 shrink-0">{fmtDateTime(e.at)}</span>
-          <span className="w-20 shrink-0 text-[#4AA8F0]">{e.callsign ?? "—"}</span>
+          <span className="w-20 shrink-0 text-[color:var(--sc-accent)]">{e.callsign ?? "—"}</span>
           <span className="flex-1">
             {e.label}
             {e.details && <span className="text-muted-foreground"> — {e.details}</span>}
@@ -475,21 +475,24 @@ function CreatorPanel() {
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("Thème du site")}</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {THEMES.map((t) => (
-            <button
+            <div
               key={t.id}
-              type="button"
-              disabled={setTheme.isPending}
-              onClick={() => t.id !== current && setTheme.mutate(t.id)}
-              className={`rounded-lg border p-3 text-left text-xs transition-colors ${t.id === current ? "border-amber-400 bg-amber-400/15" : "border-border bg-background/40 hover:bg-secondary"}`}
+              className={`flex flex-col rounded-lg border p-3 text-left text-xs ${t.id === current ? "border-amber-400 bg-amber-400/15" : "border-border bg-background/40"}`}
               data-testid={`theme-${t.id}`}
             >
               <span className="block text-lg">{t.emoji}</span>
               <span className="block font-semibold">{tr(t.label)}{t.id === current ? ` · ${tr("actif")}` : ""}</span>
-              <span className="block text-muted-foreground">{tr(t.hint)}</span>
-            </button>
+              <span className="mb-2 block flex-1 text-muted-foreground">{tr(t.hint)}</span>
+              <div className="flex flex-wrap gap-1.5">
+                <Button size="xs" variant="outline" onClick={() => setThemePreview(t.id)} data-testid={`theme-preview-${t.id}`}>{tr("Aperçu")}</Button>
+                {t.id !== current && (
+                  <Button size="xs" disabled={setTheme.isPending} onClick={() => { setThemePreview(null); setTheme.mutate(t.id); }} data-testid={`theme-apply-${t.id}`}>{tr("Activer pour tous")}</Button>
+                )}
+              </div>
+            </div>
           ))}
         </div>
-        <p className="text-[11px] text-muted-foreground">{tr("Visible par tous les membres, page de connexion comprise, dans les 5 minutes (tout de suite pour qui recharge la page).")}</p>
+        <p className="text-[11px] text-muted-foreground">{tr("« Aperçu » : essayez un thème, visible seulement dans cet onglet. « Activer pour tous » : tous les membres le voient, page de connexion comprise, dans les 5 minutes (tout de suite en rechargeant la page).")}</p>
       </div>
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("Annonce à tous les membres")}</p>
@@ -500,7 +503,7 @@ function CreatorPanel() {
           onChange={(e) => { setBody(e.target.value); setConfirm(false); }}
           placeholder={tr("Message")}
           rows={3}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[#4AA8F0]"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[color:var(--sc-accent)]"
           data-testid="announcement-body"
         />
         {confirm ? (

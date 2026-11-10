@@ -25,7 +25,7 @@ export function FlightTable({ flights, testId }: { flights: FlightSummary[]; tes
         {flights.map((f) => (
           <tr key={f.id} className="border-b border-border/50 hover:bg-accent/40" data-testid={`history-row-${f.callsign}`}>
             <td className="py-2 font-mono font-semibold">
-              <Link to={`/flights/${f.id}`} className="text-[#4AA8F0] hover:underline">{f.callsign}</Link>
+              <Link to={`/flights/${f.id}`} className="text-[color:var(--sc-accent)] hover:underline">{f.callsign}</Link>
             </td>
             <td className="font-mono">{f.departure} → {f.arrival}</td>
             <td><PhaseBadge phase={f.phase} /></td>
@@ -50,8 +50,8 @@ function View() {
     <div className="mx-auto max-w-6xl space-y-5 p-6">
       <h1 className="text-2xl font-bold">{tr("Historique des vols")}</h1>
       <div className="flex flex-wrap gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Rechercher indicatif, pilote, appareil…")} className="min-w-64 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-[#4AA8F0]" data-testid="history-search" />
-        <input value={airport} onChange={(e) => setAirport(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={4} placeholder="OACI" className="w-28 rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm outline-none focus:border-[#4AA8F0]" data-testid="history-airport" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Rechercher indicatif, pilote, appareil…")} className="min-w-64 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid="history-search" />
+        <input value={airport} onChange={(e) => setAirport(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={4} placeholder="OACI" className="w-28 rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid="history-airport" />
         <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm" data-testid="history-status">
           <option value="all">{tr("Terminés et annulés")}</option>
           <option value="termine">{tr("Terminés")}</option>
@@ -64,7 +64,7 @@ function View() {
         {h.data?.map((f) => (
           <li key={f.id} className="rounded-xl border border-border bg-card p-3 text-sm">
             <div className="flex items-center justify-between gap-2">
-              <Link to={`/flights/${f.id}`} className="font-mono text-base font-semibold text-[#4AA8F0]">{f.callsign}</Link>
+              <Link to={`/flights/${f.id}`} className="font-mono text-base font-semibold text-[color:var(--sc-accent)]">{f.callsign}</Link>
               <PhaseBadge phase={f.phase} />
             </div>
             <div className="mt-1 flex items-center justify-between gap-2 font-mono">
@@ -72,7 +72,7 @@ function View() {
               <span className="text-muted-foreground">{fmtDur(f.duration_min)}</span>
             </div>
             <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <Link to={`/pilotes/${f.pilot_id}`} className="truncate hover:text-[#4AA8F0]">{f.pilot_name}</Link>
+              <Link to={`/pilotes/${f.pilot_id}`} className="truncate hover:text-[color:var(--sc-accent)]">{f.pilot_name}</Link>
               <span className="shrink-0 font-mono">{f.departed_at ? fmtDateTime(f.departed_at) : "—"}</span>
             </div>
           </li>
@@ -90,8 +90,8 @@ function View() {
           <tbody>
             {h.data?.map((f) => (
               <tr key={f.id} className="border-b border-border/50 transition-colors duration-150 hover:bg-accent/40" data-testid={`history-row-${f.callsign}`}>
-                <td className="px-3 py-2.5"><Link to={`/pilotes/${f.pilot_id}`} className="hover:text-[#4AA8F0]">{f.pilot_name}</Link></td>
-                <td className="px-3 font-mono font-semibold"><Link to={`/flights/${f.id}`} className="text-[#4AA8F0] hover:underline">{f.callsign}</Link></td>
+                <td className="px-3 py-2.5"><Link to={`/pilotes/${f.pilot_id}`} className="hover:text-[color:var(--sc-accent)]">{f.pilot_name}</Link></td>
+                <td className="px-3 font-mono font-semibold"><Link to={`/flights/${f.id}`} className="text-[color:var(--sc-accent)] hover:underline">{f.callsign}</Link></td>
                 <td className="px-3 font-mono">{f.departure}</td>
                 <td className="px-3 font-mono">{f.arrival}</td>
                 <td className="px-3 font-mono text-muted-foreground">{f.departed_at ? fmtDateTime(f.departed_at) : "—"}</td>

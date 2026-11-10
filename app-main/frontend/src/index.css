@@ -184,18 +184,68 @@
 /* phones: no grey flash on tap, no accidental double-tap zoom on buttons */
 button, a, [role="tab"] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
-/* ---- Thèmes saisonniers (choisis par le Créateur, Administration) ---- */
-.theme-decor { position: fixed; inset: 0; pointer-events: none; z-index: 950; overflow: hidden; }
-.theme-particle {
-  position: absolute; top: -40px; opacity: 0.75; color: #fff; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
-  animation-name: theme-fall; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform;
+/* ---- Thèmes saisonniers (choisis par le Créateur dans Administration) ----
+   Les couleurs de l'interface passent par ces variables : un thème les remplace toutes d'un coup.
+   La carte (fond, avions, tracés) garde ses couleurs pour rester lisible. */
+:root {
+  --sc-accent: #4AA8F0; --sc-accent-soft: #7CC0F5; --sc-accent-softer: #9CCBF5;
+  --sc-primary: #2B63C9; --sc-primary-hover: #3572DB;
+  --sc-topbar: #070D1A; --sc-sidebar: #0A1222; --sc-panel: #0B1220; --sc-glow: #12264A; --sc-deep: #04070F;
 }
-@keyframes theme-fall {
-  0% { transform: translate3d(0, -40px, 0) rotate(0deg); }
-  50% { transform: translate3d(var(--drift), 50vh, 0) rotate(180deg); }
-  100% { transform: translate3d(0, 105vh, 0) rotate(360deg); }
+
+html[data-theme="noel"] {
+  --sc-accent: #3FCB72; --sc-accent-soft: #F4C95D; --sc-accent-softer: #FBE3A4;
+  --sc-primary: #C62828; --sc-primary-hover: #E53935;
+  --sc-topbar: #0A140F; --sc-sidebar: #0C1913; --sc-panel: #0D1A14; --sc-glow: #1E3B2A; --sc-deep: #050B08;
+  --background: #08120D; --card: #0F1F17; --popover: #0F1F17; --primary: #C62828; --secondary: #17301F;
+  --muted: #17301F; --accent: #1C3826; --border: #24452F; --input: #2E5A3D; --ring: #3FCB72;
+  --sidebar: #0F1F17; --sidebar-primary: #3FCB72; --sidebar-accent: #17301F; --sidebar-border: #24452F; --chart-1: #3FCB72;
+  --color-sky-100: #FFF4D6; --color-sky-200: #FBE3A4; --color-sky-300: #F4C95D; --color-sky-500: #E0A82E; --color-sky-700: #8A6414;
 }
-@media (prefers-reduced-motion: reduce) { .theme-decor { display: none; } }
-html[data-theme="noel"] [data-testid="top-bar"] { border-bottom: 2px solid transparent; border-image: repeating-linear-gradient(90deg, #dc2626 0 24px, #f8fafc 24px 32px, #16a34a 32px 56px, #f8fafc 56px 64px) 1; }
-html[data-theme="halloween"] [data-testid="top-bar"] { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, #f97316, #7c3aed, #f97316) 1; }
-html[data-theme="paques"] [data-testid="top-bar"] { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, #f9a8d4, #fde68a, #a7f3d0, #bfdbfe, #f9a8d4) 1; }
+html[data-theme="halloween"] {
+  --sc-accent: #FF8A2A; --sc-accent-soft: #C99BFF; --sc-accent-softer: #E2CCFF;
+  --sc-primary: #D9480F; --sc-primary-hover: #F76707;
+  --sc-topbar: #0C0612; --sc-sidebar: #12091B; --sc-panel: #140A1E; --sc-glow: #3A1352; --sc-deep: #050208;
+  --background: #0B0610; --card: #170D22; --popover: #170D22; --primary: #D9480F; --secondary: #24123A;
+  --muted: #24123A; --accent: #2C1646; --border: #3B1F57; --input: #4D2A70; --ring: #FF8A2A;
+  --sidebar: #170D22; --sidebar-primary: #FF8A2A; --sidebar-accent: #24123A; --sidebar-border: #3B1F57; --chart-1: #FF8A2A;
+  --color-sky-100: #F3E8FF; --color-sky-200: #E2CCFF; --color-sky-300: #C99BFF; --color-sky-500: #A855F7; --color-sky-700: #6B21A8;
+}
+html[data-theme="paques"] {
+  --sc-accent: #FF8FC4; --sc-accent-soft: #8FE3C0; --sc-accent-softer: #FFE59A;
+  --sc-primary: #C2508F; --sc-primary-hover: #D96AA6;
+  --sc-topbar: #0E0C1D; --sc-sidebar: #131128; --sc-panel: #15132D; --sc-glow: #3B2E70; --sc-deep: #07060F;
+  --background: #0D0B1C; --card: #18152F; --popover: #18152F; --primary: #C2508F; --secondary: #241F44;
+  --muted: #241F44; --accent: #2B2552; --border: #362F63; --input: #453C7A; --ring: #FF8FC4;
+  --sidebar: #18152F; --sidebar-primary: #FF8FC4; --sidebar-accent: #241F44; --sidebar-border: #362F63; --chart-1: #FF8FC4;
+  --color-sky-100: #EEE8FF; --color-sky-200: #DCD0FF; --color-sky-300: #C3B1FF; --color-sky-500: #9A7BFF; --color-sky-700: #5A3FC4;
+}
+
+/* décorations : jamais d'objet qui bouge sur la carte, seulement des lumières qui scintillent doucement */
+.theme-bulb { filter: drop-shadow(0 0 3px currentColor); animation: theme-twinkle 2.8s ease-in-out infinite; }
+.theme-bulb-1 { animation-delay: -0.9s; } .theme-bulb-2 { animation-delay: -1.8s; }
+@keyframes theme-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .theme-bulb { animation: none; } }
+
+/* liseré de couleur en haut des panneaux (radar, page du vol, barre du bas sur téléphone) */
+.theme-stripe { display: none; height: 4px; flex-shrink: 0; }
+html[data-theme="noel"] .theme-stripe { display: block; background: repeating-linear-gradient(135deg, #C62828 0 10px, #F8FAFC 10px 20px, #2E7D32 20px 30px, #F8FAFC 30px 40px); }
+html[data-theme="halloween"] .theme-stripe { display: block; background: repeating-linear-gradient(135deg, #F76707 0 10px, #1A0F24 10px 20px, #9333EA 20px 30px, #1A0F24 30px 40px); }
+html[data-theme="paques"] .theme-stripe { display: block; background: linear-gradient(90deg, #F9A8D4, #FDE68A, #A7F3D0, #C4B5FD, #BAE6FD, #F9A8D4); }
+
+/* entrée active du menu */
+html[data-theme="noel"] [data-testid="sidebar"] a[aria-current="page"]::before {
+  content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 4px; border-radius: 2px;
+  background: repeating-linear-gradient(135deg, #C62828 0 4px, #F8FAFC 4px 8px);
+}
+html[data-theme="halloween"] [data-testid="sidebar"] a[aria-current="page"] { box-shadow: inset 0 2px 0 #8B0A0A; }
+html[data-theme="halloween"] [data-testid="sidebar"] a[aria-current="page"]::before,
+html[data-theme="halloween"] [data-testid="sidebar"] a[aria-current="page"]::after {
+  content: ""; position: absolute; top: 0; background: linear-gradient(#8B0A0A, #C1121F); border-radius: 0 0 50% 50% / 0 0 70% 70%;
+}
+html[data-theme="halloween"] [data-testid="sidebar"] a[aria-current="page"]::before { left: 14px; width: 6px; height: 13px; }
+html[data-theme="halloween"] [data-testid="sidebar"] a[aria-current="page"]::after { left: 34px; width: 4px; height: 8px; }
+html[data-theme="paques"] [data-testid="sidebar"] a[aria-current="page"]::before {
+  content: ""; position: absolute; left: 3px; top: 50%; width: 7px; height: 9px; margin-top: -4.5px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: linear-gradient(180deg, #F9A8D4 0 35%, #FFFFFF 35% 50%, #A7F3D0 50%);
+}

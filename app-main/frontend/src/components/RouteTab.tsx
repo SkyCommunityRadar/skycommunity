@@ -41,7 +41,7 @@ export default function RouteTab({ flight: f }: { flight: FlightDetail }) {
                 {f.route.map((w, i) => (
                   <tr
                     key={`${w.ident}-${i}`}
-                    className={i === f.position.wp_index && f.position.track === "air" ? "text-[#4AA8F0]" : ""}
+                    className={i === f.position.wp_index && f.position.track === "air" ? "text-[color:var(--sc-accent)]" : ""}
                   >
                     <td>{i}</td>
                     <td>{w.ident}</td>

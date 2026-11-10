@@ -63,7 +63,7 @@ function ReviewForm({ it, onDone }: { it: Interaction; onDone?: () => void }) {
       </div>
       {it.deadline && <p className="text-[11px] text-muted-foreground">{tr("Avis possible jusqu'au {0}", [fmtDateTime(it.deadline)])}</p>}
       <StarPicker value={rating} onChange={setRating} testId={`review-stars-${id}`} />
-      <textarea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} rows={2} placeholder={tr("Commentaire (respectueux, 500 caractères max.)")} className="w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm outline-none focus:border-[#4AA8F0]" data-testid={`review-comment-${id}`} />
+      <textarea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} rows={2} placeholder={tr("Commentaire (respectueux, 500 caractères max.)")} className="w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm outline-none focus:border-[color:var(--sc-accent)]" data-testid={`review-comment-${id}`} />
       {declining ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-amber-200">{tr("Ne laisser aucun avis pour ce vol ? Ce n'est plus possible ensuite.")}</span>
@@ -160,7 +160,7 @@ export function ReviewPrompt() {
   if (items.length === 0) return null;
   return (
     <div className="fixed inset-0 z-[800] flex items-center justify-center bg-black/60 p-4" data-testid="end-flight-reviews">
-      <div className="max-h-[85vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-xl border border-border bg-[#0B1220] p-4 shadow-2xl">
+      <div className="max-h-[85vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-xl border border-border bg-[color:var(--sc-panel)] p-4 shadow-2xl">
         <h2 className="text-lg font-semibold">{tr("Avis de fin de vol")}</h2>
         <p className="text-sm text-muted-foreground">{tr("Le vol est terminé : donnez votre avis sur l'échange, ou choisissez de ne pas en laisser.")}</p>
         {items.map((it) => <ReviewForm key={reviewKey(it)} it={it} onDone={() => setForced(null)} />)}

@@ -78,14 +78,14 @@ function StripCard({ s, selected, onSelect }: { s: Strip; selected: boolean; onS
   };
   return (
     <div
-      className={`rounded border-l-4 border bg-background/70 p-2 text-xs transition-[border-color,background-color] duration-150 ${selected ? "border-[#4AA8F0] bg-[#4AA8F0]/5" : "border-border border-l-[#1E6FD9]"}`}
+      className={`rounded border-l-4 border bg-background/70 p-2 text-xs transition-[border-color,background-color] duration-150 ${selected ? "border-[color:var(--sc-accent)] bg-[color:var(--sc-accent)]/5" : "border-border border-l-[color:var(--sc-primary-hover)]"}`}
       data-testid={`strip-${id}`}
     >
       <div className="flex items-center justify-between gap-2">
         <button className="text-left" onClick={() => onSelect?.(s.flight_id)} data-testid={`strip-select-${id}`}>
-          <span className="font-mono text-sm font-bold text-[#4AA8F0]">{s.callsign}</span>{" "}
+          <span className="font-mono text-sm font-bold text-[color:var(--sc-accent)]">{s.callsign}</span>{" "}
           {s.atis_letter ? (
-            <span className="ml-1 rounded bg-[#2B63C9]/30 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-200" title={tr("Lettre ATIS")} data-testid={`strip-atis-${s.flight_id}`}>
+            <span className="ml-1 rounded bg-[color:var(--sc-primary)]/30 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-200" title={tr("Lettre ATIS")} data-testid={`strip-atis-${s.flight_id}`}>
               ATIS {s.atis_letter}
             </span>
           ) : null}{" "}
@@ -123,14 +123,14 @@ function StripCard({ s, selected, onSelect }: { s: Strip; selected: boolean; onS
                     maxLength={f.unit && form[f.unit] === "FL" ? 3 : f.max}
                     placeholder={f.unit && form[f.unit] === "FL" ? "060" : f.ph}
                     onChange={(e) => setForm({ ...form, [f.k]: e.target.value.replace(/\D/g, "") })}
-                    className="w-full min-w-0 rounded border border-border bg-card px-1.5 py-1 font-mono outline-none focus:border-[#4AA8F0]"
+                    className="w-full min-w-0 rounded border border-border bg-card px-1.5 py-1 font-mono outline-none focus:border-[color:var(--sc-accent)]"
                     data-testid={`strip-input-${f.k.replace(/_/g, "-")}-${id}`}
                   />
                   {f.unit && (
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, [f.unit!]: form[f.unit!] === "FT" ? "FL" : "FT" })}
-                      className="shrink-0 rounded border border-[#4AA8F0]/50 px-1.5 font-mono text-[10px] font-bold text-[#4AA8F0] transition-colors duration-150 hover:bg-[#4AA8F0]/10"
+                      className="shrink-0 rounded border border-[color:var(--sc-accent)]/50 px-1.5 font-mono text-[10px] font-bold text-[color:var(--sc-accent)] transition-colors duration-150 hover:bg-[color:var(--sc-accent)]/10"
                       title={tr("Basculer pieds (FT) / niveau de vol (FL)")}
                       data-testid={`strip-unit-${f.k.replace(/_/g, "-")}-${id}`}
                     >
@@ -150,7 +150,7 @@ function StripCard({ s, selected, onSelect }: { s: Strip; selected: boolean; onS
                   maxLength={f.max}
                   placeholder={f.ph}
                   onChange={(e) => setForm({ ...form, [f.k]: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })}
-                  className="w-full min-w-0 rounded border border-border bg-card px-1.5 py-1 font-mono outline-none focus:border-[#4AA8F0]"
+                  className="w-full min-w-0 rounded border border-border bg-card px-1.5 py-1 font-mono outline-none focus:border-[color:var(--sc-accent)]"
                   data-testid={`strip-input-${f.k.replace(/_/g, "-")}-${id}`}
                 />
               </label>
@@ -162,7 +162,7 @@ function StripCard({ s, selected, onSelect }: { s: Strip; selected: boolean; onS
             maxLength={120}
             placeholder={tr("Remarques")}
             onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-            className="w-full rounded border border-border bg-card px-1.5 py-1 outline-none focus:border-[#4AA8F0]"
+            className="w-full rounded border border-border bg-card px-1.5 py-1 outline-none focus:border-[color:var(--sc-accent)]"
             data-testid={`strip-input-remarks-${id}`}
           />
           <div className="flex justify-end gap-1.5">
@@ -239,7 +239,7 @@ export default function StripBoard({ selectedId, onSelect, myAirport }: { select
           onChange={(e) => setIcao(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
           maxLength={4}
           placeholder={tr("Filtrer par OACI (ex. LFPG)")}
-          className="flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-sm outline-none focus:border-[#4AA8F0]"
+          className="flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-sm outline-none focus:border-[color:var(--sc-accent)]"
           data-testid="strip-icao-filter"
         />
         {ap && (

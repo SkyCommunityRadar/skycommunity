@@ -65,7 +65,7 @@ export default function RejectedTakeoff({ flight: f, code, onClose, ed }: { flig
     <div className="space-y-3 rounded-xl border border-red-500/50 bg-red-500/8 p-4" data-testid="rejected-takeoff">
       <p className="text-sm font-semibold">{toHold ? tr("Interrompre : retour au point d'attente") : tr("Interrompre : retour au parking")}</p>
       {left != null && <p className="text-[11px] text-muted-foreground">{tr("Encore {0} s pour interrompre le décollage.", [left])}</p>}
-      <p className="text-xs text-[#7CC0F5]">
+      <p className="text-xs text-[color:var(--sc-accent-soft)]">
         {toHold
           ? tr("Cliquez le taxiway de sortie, les voies suivantes dans l'ordre, puis le nouveau point d'attente (cercle orange).")
           : tr("Cliquez le taxiway de sortie, les voies suivantes dans l'ordre, puis le poste de stationnement.")}

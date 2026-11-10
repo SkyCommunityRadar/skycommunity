@@ -4,7 +4,7 @@ import { tr } from "@/lib/i18n";
 function S({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-lg font-semibold text-[#7CC0F5]">{title}</h2>
+      <h2 className="text-lg font-semibold text-[color:var(--sc-accent-soft)]">{title}</h2>
       <div className="space-y-2 text-sm leading-relaxed text-foreground/90">{children}</div>
     </section>
   );
@@ -13,7 +13,7 @@ function S({ title, children }: { title: string; children: React.ReactNode }) {
 /** Public privacy notice (RGPD): what SkyCommunity Radar stores, why, for how long, and how to get it removed. */
 export default function Confidentialite() {
   return (
-    <div className="min-h-dvh bg-[#04070F] px-4 py-10" data-testid="privacy-page">
+    <div className="min-h-dvh bg-[color:var(--sc-deep)] px-4 py-10" data-testid="privacy-page">
       <article className="mx-auto max-w-2xl space-y-7">
         <header className="space-y-2">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">{tr("← SkyCommunity Radar")}</Link>
@@ -60,7 +60,7 @@ export default function Confidentialite() {
 
         <S title={tr("Vos droits")}>
           <p>{tr("Vous pouvez demander à")}{" "}<b>{tr("voir")}</b>, <b>{tr("corriger")}</b>{" "}{tr("ou")}{" "}<b>{tr("supprimer")}</b>{" "}{tr("vos données à tout moment : écrivez à un administrateur sur le serveur Discord SkyCommunity. La suppression efface votre profil, vos vols et les avis vous concernant. Votre nom affiché et votre Pilot ID SimBrief se modifient aussi directement dans « Mon profil ».")}</p>
-          <p>{tr("Si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la CNIL (")}<a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer" className="text-[#7CC0F5] underline">{tr("cnil.fr")}</a>).
+          <p>{tr("Si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la CNIL (")}<a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer" className="text-[color:var(--sc-accent-soft)] underline">{tr("cnil.fr")}</a>).
           </p>
         </S>
 

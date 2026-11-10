@@ -65,7 +65,7 @@ export default function HandoverNotice() {
               {list.map((h) => (
                 <li key={h.id} className="flex items-center justify-between rounded-md bg-background/70 px-3 py-2 text-sm">
                   <span>
-                    <Radio className="mr-1.5 inline h-3.5 w-3.5 text-[#4AA8F0]" />
+                    <Radio className="mr-1.5 inline h-3.5 w-3.5 text-[color:var(--sc-accent)]" />
                     <b className="font-mono">{h.callsign}</b>
                     <span className="ml-2 text-xs text-muted-foreground">
                       {h.from_controller} — {h.reason === "fermeture" ? tr("position fermée") : tr("connexion perdue")}
