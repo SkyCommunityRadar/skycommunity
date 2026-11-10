@@ -72,9 +72,6 @@ interface Props {
   onTaxiwayClick?: (icao: string, lat: number, lon: number, name?: string | null) => void;
   /** When set, named holding points become clickable (pilot picks his holding point on the map). */
   onHoldingClick?: (icao: string, h: Holding) => void;
-  /** points to pick on the map (e.g. runway exits after an interrupted take-off) */
-  pickPoints?: { id: string; lat: number; lon: number; label: string; selected?: boolean }[];
-  onPickPoint?: (id: string) => void;
   /** Holding point recorded in the flight (drawn highlighted). */
   selectedHolding?: { ref: string | null; lat: number; lon: number } | null;
   onMapClick?: (lat: number, lon: number) => void;
@@ -142,19 +139,29 @@ const angDiff = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180);
  * belongs to (06L = end you land on heading ~060°), rotated along the runway so it reads from the approach. */
 export function runwayEnds(lines: GroundLine[]): { label: string; lat: number; lon: number; rot: number }[] {
   const by = new Map<string, number[][]>();
+  const unnamed: number[][][] = []; // OSM often maps the end of a runway as a separate piece with no name
   for (const l of lines) {
-    if (l.kind !== "runway" || !l.name || !RWY_DESIG.test(l.name.replace(/\s/g, ""))) continue;
+    if (l.kind !== "runway") continue;
+    if (!l.name || !RWY_DESIG.test(l.name.replace(/\s/g, ""))) {
+      unnamed.push(l.path);
+      continue;
+    }
     const k = l.name.replace(/\s/g, "");
     by.set(k, [...(by.get(k) ?? []), ...l.path]);
   }
   const out: { label: string; lat: number; lon: number; rot: number }[] = [];
-  for (const [name, pts] of by) {
-    if (pts.length < 2) continue;
-    // extreme points along the main axis
-    const axis = bearing(pts[0], pts[pts.length - 1]);
+  for (const [name, named] of by) {
+    if (named.length < 2) continue;
+    const cosl = Math.cos(rad(named[0][0]));
+    const gap = (p: number[], q: number[]) => Math.hypot((p[1] - q[1]) * cosl, p[0] - q[0]);
+    const farthest = (from: number[]) => named.reduce((best, p) => (gap(from, p) > gap(from, best) ? p : best), from);
+    const e1 = farthest(named[0]), e2 = farthest(e1);
+    const axis = bearing(e1, e2);
     const ux = Math.sin(rad(axis)), uy = Math.cos(rad(axis));
-    const lat0 = pts[0][0], cosl = Math.cos(rad(lat0));
-    const proj = (p: number[]) => (p[1] - pts[0][1]) * cosl * ux + (p[0] - lat0) * uy;
+    const offAxis = (p: number[]) => Math.abs((p[1] - e1[1]) * cosl * uy - (p[0] - e1[0]) * ux);
+    // the real ends of the drawn runway: its unnamed pieces in line with it (about 45 m around the axis) count too
+    const pts = [...named, ...unnamed.filter((path) => path.every((p) => offAxis(p) < 0.0004)).flat()];
+    const proj = (p: number[]) => (p[1] - e1[1]) * cosl * ux + (p[0] - e1[0]) * uy;
     let a = pts[0], b = pts[0];
     for (const p of pts) {
       if (proj(p) < proj(a)) a = p;
@@ -524,25 +531,6 @@ export default function RadarMap(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig(p.firs?.map((f) => f.properties.id)), sig(p.tracons?.map((f) => f.properties.id)), sig(p.atc?.map((x) => [x.callsign, x.frequency, x.lat, x.lon, x.fir_id, x.tracon_id]))]);
 
-  // points to pick (runway exits…): big orange circles with their name, the chosen one in green
-  useEffect(() => {
-    const r = layers.current.route;
-    if (!r || !map.current) return;
-    const g = L.layerGroup().addTo(map.current);
-    for (const pt of p.pickPoints ?? []) {
-      const on = !!pt.selected;
-      L.circleMarker([pt.lat, pt.lon], {
-        radius: on ? 10 : 9, color: on ? "#22C55E" : "#F97316", weight: 2, fillColor: on ? "#22C55E" : "#F97316",
-        fillOpacity: on ? 0.55 : 0.25, bubblingMouseEvents: false,
-      })
-        .bindTooltip(esc(pt.label), { permanent: true, direction: "right", className: on ? "twy-label twy-hold twy-hold-on" : "twy-label twy-hold" })
-        .on("click", () => cb.current.onPickPoint?.(pt.id))
-        .addTo(g);
-    }
-    return () => { g.remove(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig(p.pickPoints?.map((x) => [x.id, x.selected]))]);
-
   // selected route (planned dashed + flown solid) and waypoints
   useEffect(() => {
     const r = layers.current.route;
@@ -628,7 +616,17 @@ export default function RadarMap(p: Props) {
         markers.current.set(f.id, mk);
       } else {
         const ll = mk.getLatLng();
-        if (ll.lat !== f.position.lat || ll.lng !== f.position.lon) mk.setLatLng([f.position.lat, f.position.lon]);
+        if (ll.lat !== f.position.lat || ll.lng !== f.position.lon) {
+          // a correction (exit chosen, ±NM…) is a jump, not a movement: no gliding across the map
+          const jump = ll.distanceTo([f.position.lat, f.position.lon]) > (f.position.on_ground ? 30 : 3700);
+          const node = jump ? mk.getElement() : undefined;
+          if (node) node.style.transition = "none";
+          mk.setLatLng([f.position.lat, f.position.lon]);
+          if (node) {
+            void node.offsetWidth;
+            requestAnimationFrame(() => { node.style.transition = ""; });
+          }
+        }
         if (iconHtml.current.get(f.id) !== html) mk.setIcon(icon); // rebuilding the DOM only when something changed
       }
       mk.setZIndexOffset(f.id === p.selectedId ? 5000 : 1000); // the selected aircraft is drawn above the others

@@ -54,15 +54,13 @@ function DetailView({ id }: { id: string; user: User }) {
           lineupPath={f.lineup ?? undefined}
           taxis={ed.taxis}
           grounds={grounds}
-          highlightGates={[f.dep_gate?.ref, f.arr_gate?.ref].filter((r): r is string => !!r)}
+          highlightGates={ed.gateHighlight ?? [f.dep_gate?.ref, f.arr_gate?.ref].filter((r): r is string => !!r)}
           draftPoints={ed.draftPoints}
           onMapClick={ed.onMapClick}
           onHoldingClick={ed.onHoldingClick}
           onTaxiwayClick={ed.onTaxiwayClick}
           onGateClick={ed.onGateClick}
-          pickPoints={ed.pickPoints}
-          onPickPoint={ed.onPickPoint}
-          selectedHolding={ed.editingKind === "taxi_out" ? ed.destination : f.holding_point}
+          selectedHolding={ed.editingKind === "taxi_out" || ed.mode === "reject_hold" ? ed.destination : f.holding_point}
           crosshair={ed.crosshair}
           pushHint={ed.pushHint}
           center={ed.focusAt ?? [f.position.lat, f.position.lon]}

@@ -132,15 +132,13 @@ function RadarView({ user, mode }: { user: User; mode: UiMode }) {
           onViewChange={setView}
           taxis={selected ? ed.taxis : []}
           grounds={grounds}
-          highlightGates={selected ? [selected.dep_gate?.ref, selected.arr_gate?.ref].filter((r): r is string => !!r) : undefined}
+          highlightGates={ed.gateHighlight ?? (selected ? [selected.dep_gate?.ref, selected.arr_gate?.ref].filter((r): r is string => !!r) : undefined)}
           draftPoints={ed.draftPoints}
           onMapClick={ed.onMapClick}
           onHoldingClick={ed.onHoldingClick}
           onTaxiwayClick={ed.onTaxiwayClick}
           onGateClick={ed.onGateClick}
-          pickPoints={ed.pickPoints}
-          onPickPoint={ed.onPickPoint}
-          selectedHolding={ed.editingKind === "taxi_out" ? ed.destination : selected?.holding_point}
+          selectedHolding={ed.editingKind === "taxi_out" || ed.mode === "reject_hold" ? ed.destination : selected?.holding_point}
           crosshair={ed.crosshair}
           pushHint={ed.pushHint}
           center={focus?.c}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiPost, apiPut } from "@/lib/api";
-import { errMsg, useFlightMutation } from "@/lib/hooks";
+import { errMsg, useFlightMutation, useGround } from "@/lib/hooks";
 import type { FlightDetail, TaxiPreview } from "@/lib/types";
 import { isLiveTaxi } from "@/lib/useFlightEditing";
 
@@ -17,20 +17,25 @@ interface Props {
   onDone: () => void;
   /** departure: the holding point the route ends on */
   destination?: { ref: string | null; lat: number; lon: number } | null;
+  /** arrival: the stand clicked as the last point */
+  destGate?: string | null;
 }
 
-/** ATC enters a taxi route by clicking on the taxiways; the server routes it along the real OSM network. */
-export default function TaxiEditor({ flight, kind, editing, points, setPoints, onPreview, onEdit, onDone, destination }: Props) {
+/** The route is entered point by point on the taxiways, in the order it is followed. */
+export default function TaxiEditor({ flight, kind, editing, points, setPoints, onPreview, onEdit, onDone, destination, destGate }: Props) {
   const m = useFlightMutation(flight.id);
   const current = flight[kind];
   const out = kind === "taxi_out";
   const icao = out ? flight.departure : flight.arrival;
-  const gate = out ? flight.dep_gate : flight.arr_gate;
+  const startGate = out ? flight.dep_gate?.ref : undefined;
+  const ground = useGround(out ? undefined : flight.arrival);
   const [preview, setPreview] = useState<TaxiPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const live = isLiveTaxi(flight, kind);
   const dest = out && destination ? { holding_lat: destination.lat, holding_lon: destination.lon } : {};
-  const ready = points.length > 0 || (out ? !!destination : live);
+  const needGate = !out && (ground.data?.gates.length ?? 1) > 0;
+  // arrival: at least the exit taxiway and the stand (from the aircraft when it is already taxiing)
+  const ready = out ? points.length > 0 || !!destination : live ? points.length > 0 || !!destGate : points.length >= 2 || (points.length >= 1 && !!destGate);
 
   useEffect(() => {
     if (!editing || !ready) {
@@ -39,50 +44,60 @@ export default function TaxiEditor({ flight, kind, editing, points, setPoints, o
       onPreview([]);
       return;
     }
-    let live = true;
+    let live_ = true;
     const params = new URLSearchParams({ flight_id: flight.id });
-    if (gate) params.set(out ? "start_gate" : "end_gate", gate.ref);
-    const qs = `?${params}`;
-    apiPost<TaxiPreview>(`/airports/${icao}/taxi-preview${qs}`, { kind, points, ...dest })
+    if (startGate) params.set("start_gate", startGate);
+    if (!out && destGate) params.set("end_gate", destGate);
+    apiPost<TaxiPreview>(`/airports/${icao}/taxi-preview?${params}`, { kind, points, ...dest })
       .then((p) => {
-        if (!live) return;
+        if (!live_) return;
         setPreview(p);
         setError(null);
         onPreview(p.path);
       })
-      .catch((e) => live && setError(errMsg(e)));
+      .catch((e) => live_ && setError(errMsg(e)));
     return () => {
-      live = false;
+      live_ = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, points, icao, gate?.ref, destination?.lat, destination?.lon]);
+  }, [editing, ready, points, icao, startGate, destGate, destination?.lat, destination?.lon]);
 
+  const canSave = !!preview && !error && !m.isPending && (out || !needGate || !!destGate);
   const save = () =>
     m.mutate(
-      { fn: () => apiPut<FlightDetail>(`/flights/${flight.id}/taxi`, { kind, points, version: flight.version, ...(destination ? { holding_ref: destination.ref, holding_lat: destination.lat, holding_lon: destination.lon } : {}) }), success: tr("Roulage enregistré") },
+      {
+        fn: () => apiPut<FlightDetail>(`/flights/${flight.id}/taxi`, {
+          kind, points, version: flight.version,
+          ...(destination && out ? { holding_ref: destination.ref, holding_lat: destination.lat, holding_lon: destination.lon } : {}),
+          ...(destGate && !out ? { gate_ref: destGate } : {}),
+        }),
+        success: tr("Roulage enregistré"),
+      },
       { onSuccess: onDone },
     );
+  const names = (preview?.names ?? []).filter((n) => n !== "Stand");
 
   return (
     <div className="space-y-2 text-xs" data-testid={`taxi-editor-${kind}`}>
       {editing ? (
         <div className="space-y-2">
           <p className="text-[#4AA8F0]">
-            {live
-              ? tr("L'avion roule : le nouveau tracé part de sa position. Cliquez les voies à emprunter, point par point, jusqu'à la destination.")
-              : out
-              ? tr("Cliquez sur la carte les voies à emprunter, point par point. Cliquez un cercle orange pour changer de point d'attente. Le tracé suit automatiquement les taxiways.")
-              : gate
-                ? tr("Poste {0} enregistré : cliquez la sortie de piste, même derrière l'avion. Le tracé jusqu'au poste est automatique, ajoutez des points pour le modifier.", [gate.ref])
-                : tr("Choisissez d'abord le poste d'arrivée, puis la sortie de piste.")}
+            {out
+              ? live
+                ? tr("L'avion roule : le nouveau tracé part de sa position. Cliquez les voies à emprunter, point par point, jusqu'à la destination.")
+                : tr("Cliquez sur la carte les voies à emprunter, point par point. Cliquez un cercle orange pour changer de point d'attente. Le tracé suit automatiquement les taxiways.")
+              : live
+                ? tr("L'avion roule : le nouveau tracé part de sa position. Cliquez les voies à emprunter, puis la porte d'arrivée.")
+                : tr("Cliquez d'abord le taxiway de sortie de piste, puis les voies suivantes dans l'ordre, et terminez en cliquant la porte d'arrivée.")}
           </p>
           {out && destination && <p className="text-[11px] text-muted-foreground" data-testid="taxi-destination">{tr("Destination : {0}", [destination.ref ?? "—"])}</p>}
+          {!out && <p className="text-[11px] text-muted-foreground" data-testid="taxi-destination">{destGate ? tr("Destination : {0}", [destGate]) : needGate ? tr("Porte d'arrivée : pas encore cliquée") : ""}</p>}
           <p className="font-mono text-[11px]" data-testid={`taxi-${kind}-preview`}>
-            {!ready ? tr("Aucun point.") : preview ? tr("{0} · {1} NM", [preview.names.join(" → ") || "—", preview.length_nm.toFixed(2)]) : tr("Calcul…")}
+            {!ready ? (points.length ? tr("Sortie choisie.") : tr("Aucun point.")) : preview ? tr("{0} · {1} NM", [names.join(" → ") || "—", preview.length_nm.toFixed(2)]) : tr("Calcul…")}
           </p>
           {error && <p className="text-red-400" data-testid={`taxi-${kind}-error`}>{error}</p>}
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={save} disabled={!preview || !!error || m.isPending} data-testid={`taxi-${kind}-save`}>{tr("Enregistrer le roulage")}</Button>
+            <Button size="sm" onClick={save} disabled={!canSave} data-testid={`taxi-${kind}-save`}>{tr("Enregistrer le roulage")}</Button>
             <Button size="sm" variant="outline" disabled={points.length === 0} onClick={() => setPoints(points.slice(0, -1))} data-testid={`taxi-${kind}-undo`}>{tr("Annuler le dernier point")}</Button>
             <Button size="sm" variant="ghost" onClick={onDone} data-testid={`taxi-${kind}-cancel`}>{tr("Fermer")}</Button>
           </div>

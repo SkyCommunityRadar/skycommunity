@@ -51,7 +51,10 @@ def locate(points: list[tuple[float, float]], cum: list[float], d: float) -> tup
     seg = cum[i + 1] - cum[i]
     f = (d - cum[i]) / seg if seg > 0 else 0.0
     lat, lon = gc_interpolate(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], f)
-    hdg = bearing_deg(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1])
+    j = i
+    while j > 0 and cum[j + 1] - cum[j] < 1e-6:  # a zero-length segment has no direction (it read as "north")
+        j -= 1
+    hdg = bearing_deg(points[j][0], points[j][1], points[j + 1][0], points[j + 1][1])
     passed = n - 1 if d >= cum[-1] else i
     return lat, lon, hdg, passed
 

@@ -94,6 +94,7 @@ def _name(tags: dict) -> str:
 
 
 _PAREN_N = re.compile(r"\s*\(\d+\)\s*$")
+_TWY_CODE = re.compile(r"^[A-Za-z]{1,3}\d{0,3}[A-Za-z]?$")
 _RWY_PART = re.compile(r"^(?:RWY\s*)?(?:\d{2}[LRC]?|[A-Z]\d{2}[LRC])$")  # 28L, W28L, RWY 09 : un morceau de nom qui désigne une piste
 
 
@@ -107,6 +108,9 @@ def clean_ground_name(raw: str | None) -> str:
         kept = [x for x in parts if x and not _RWY_PART.match(x.upper())]
         if kept and len(kept) < len(parts):
             name = "/".join(kept)
+    # seuls les vrais codes de voie sont affichés (T, T9, RP15, 06L/24R…), pas un nom descriptif (« de Provence »)
+    if not all(_TWY_CODE.match(x) or _RWY_PART.match(x.upper()) for x in name.split("/")):
+        return ""
     return name
 
 
@@ -239,12 +243,33 @@ class Graph:
             self.adj[a].append((b, w, name))
             self.adj[b].append((a, w, name))
         self.gates = {g["ref"]: g for g in doc["gates"]}
+        self.segs = [(int(a), int(b), name, kind) for a, b, name, kind in doc["edges"]
+                     if int(a) in self.coords and int(b) in self.coords]
 
     def nearest(self, lat: float, lon: float) -> int:
         k = math.cos(math.radians(lat))
         return min(self.coords, key=lambda n: (self.coords[n][0] - lat) ** 2 + ((self.coords[n][1] - lon) * k) ** 2)
 
-    def shortest(self, a: int, b: int) -> list[int]:
+    def snap(self, lat: float, lon: float) -> tuple[int, int, str, str, float, float, float]:
+        """Point of the network closest to a click, ON the line that was clicked: (a, b, name, kind, t, lat, lon).
+        A runway only wins when no taxiway is near: people click the yellow taxiway next to it."""
+        p, best, out = _xy(lat, (lat, lon)), math.inf, None
+        for a, b, name, kind in self.segs:
+            ca, cb = self.coords[a], self.coords[b]
+            if min(ca[0], cb[0]) > lat + 0.02 or max(ca[0], cb[0]) < lat - 0.02:
+                continue
+            (ax, ay), (bx, by) = _xy(lat, ca), _xy(lat, cb)
+            dx, dy = bx - ax, by - ay
+            t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy)))
+            d = math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy) + (80.0 if kind == "runway" else 0.0)
+            if d < best:
+                best, out = d, (a, b, name, kind, t, ca[0] + (cb[0] - ca[0]) * t, ca[1] + (cb[1] - ca[1]) * t)
+        if out is None:
+            raise HTTPException(400, "Aucune voie de circulation à cet endroit.")
+        return out
+
+    def route(self, a: int, b: int, extra: "_Stops", ban: int | None = None) -> list[int]:
+        """Shortest way along the network. `ban`: the node just arrived from, so that no leg starts with a U-turn."""
         if a == b:
             return [a]
         dist, prev, pq = {a: 0.0}, {}, [(0.0, a)]
@@ -254,7 +279,9 @@ class Graph:
                 break
             if d > dist.get(u, math.inf):
                 continue
-            for v, w, _ in self.adj[u]:
+            for v, w, _ in self.adj.get(u, []) + extra.links.get(u, []):
+                if u == a and v == ban:
+                    continue
                 nd = d + w
                 if nd < dist.get(v, math.inf):
                     dist[v], prev[v] = nd, u
@@ -275,6 +302,41 @@ class Graph:
     def gate_node(self, ref: str) -> int:
         g = self.gates[ref]
         return int(g["link"]) if g.get("link") is not None else self.nearest(g["lat"], g["lon"])
+
+
+class _Stops:
+    """Clicked points of one route, placed on the taxiway line itself (temporary nodes, the shared graph is untouched).
+    Snapping a click to the nearest intersection made the route enter a side branch and come back: the « triangles »."""
+
+    def __init__(self, g: Graph):
+        self.g, self.coords, self.links, self.on_edge = g, {}, {}, {}
+
+    def stop(self, lat: float, lon: float) -> int:
+        a, b, name, kind, t, plat, plon = self.g.snap(lat, lon)
+        k = RUNWAY_PENALTY if kind == "runway" else 1.0
+        da, db = haversine_nm(plat, plon, *self.g.coords[a]), haversine_nm(plat, plon, *self.g.coords[b])
+        if da * 1852 < 3:
+            return a
+        if db * 1852 < 3:
+            return b
+        node = -(len(self.coords) + 1)
+        self.coords[node] = (plat, plon)
+        self.links[node] = [(a, da * k, name), (b, db * k, name)]
+        self.links.setdefault(a, []).append((node, da * k, name))
+        self.links.setdefault(b, []).append((node, db * k, name))
+        for other in self.on_edge.get((min(a, b), max(a, b)), []):
+            w = haversine_nm(plat, plon, *self.coords[other]) * k
+            self.links[node].append((other, w, name))
+            self.links[other].append((node, w, name))
+        self.on_edge.setdefault((min(a, b), max(a, b)), []).append(node)
+        return node
+
+    def at(self, n: int) -> tuple[float, float]:
+        return self.coords[n] if n < 0 else self.g.coords[n]
+
+    def name(self, a: int, b: int) -> str:
+        raw = next((nm for v, _, nm in self.g.adj.get(a, []) + self.links.get(a, []) if v == b), "")
+        return re.sub(r"\s*\(\d+\)\s*$", "", raw or "").strip()
 
 
 async def _airport_ref(icao: str) -> tuple[str, float, float]:
@@ -315,7 +377,7 @@ def _seg_dist(p, a, b) -> float:
 
 def name_holdings(icao: str, doc: dict) -> dict:
     """Many airports (LFML, LFBO, KEWR…) have holding points without any name in OpenStreetMap: they could not be picked.
-    Each one gets the name of its taxiway, e.g. « D9 », « D9-2 » (auto=True). Never « (2) »."""
+    Each one gets the name of its taxiway, e.g. « D9 » (auto=True)."""
     from lib.runways import runway_ends
     holds = doc.get("holdings") or []
     if not holds or all(h.get("ref") for h in holds):
@@ -328,7 +390,6 @@ def name_holdings(icao: str, doc: dict) -> dict:
     twys = [(re.sub(r"^(Taxiway|Taxilane|TWY)\s+", "", l["name"], flags=re.I), [_xy(lat0, tuple(pt)) for pt in l["path"]])
             for l in doc.get("lines", [])
             if l.get("kind") == "taxiway" and l.get("name")]
-    used = {h["ref"] for h in holds if h.get("ref")}
     out = []
     for h in holds:
         if h.get("ref"):
@@ -352,12 +413,8 @@ def name_holdings(icao: str, doc: dict) -> dict:
         if not twy:
             out.append(h)  # no taxiway next to it: left unnamed (the runway guessed from the map was unreliable)
             continue
-        # Pas de « (2) » : base seule, puis base-2, base-3… (lisible et unique)
-        base = re.sub(r"\s*\(\d+\)\s*$", "", twy[:16]).strip() or twy[:16]
-        ref, n = base, 2
-        while ref in used:
-            ref, n = f"{base}-{n}", n + 1
-        used.add(ref)
+        # le nom du taxiway, tout court : plusieurs points d'attente peuvent le porter (reconnus par leur position)
+        ref = re.sub(r"\s*\(\d+\)\s*$", "", twy[:16]).strip() or twy[:16]
         out.append({**h, "ref": ref, "auto": True})
     return {**doc, "holdings": out}
 
@@ -435,91 +492,54 @@ async def build_taxi_path(icao: str, points: list[list[float]], start_gate: str 
     (snapped) -> [end gate | exact end point]. `origin`: the aircraft, when the route is changed while it taxies.
     `end_point`: the holding point itself, which OpenStreetMap does not always draw exactly on the taxiway."""
     g = await get_graph(icao)
+    net = _Stops(g)
     stops: list[int] = []
     head: list[tuple[float, float]] = []
     tail: list[tuple[float, float]] = []
+    tail_name = ""
+
+    def add(n: int) -> None:
+        if not stops or stops[-1] != n:
+            stops.append(n)
+
     if origin:
         head = [(origin[0], origin[1])]
-        stops.append(g.nearest(origin[0], origin[1]))
-    if start_gate:
-        s = g.gates.get(start_gate)
-        if s:
-            head = [(s["lat"], s["lon"])]
-            stops.append(g.gate_node(start_gate))
+        add(net.stop(origin[0], origin[1]))
+    if start_gate and start_gate in g.gates:
+        s = g.gates[start_gate]
+        head = [(s["lat"], s["lon"])]
+        add(g.gate_node(start_gate))
     for lat, lon in points:
-        n = g.nearest(lat, lon)
-        if not stops or stops[-1] != n:
-            stops.append(n)
-    tail_name = ""
-    if end_gate:
-        s = g.gates.get(end_gate)
-        if s:
-            n = g.gate_node(end_gate)
-            if not stops or stops[-1] != n:
-                stops.append(n)
-            tail, tail_name = [(s["lat"], s["lon"])], "Stand"
+        add(net.stop(lat, lon))
+    if end_gate and end_gate in g.gates:
+        s = g.gates[end_gate]
+        add(g.gate_node(end_gate))
+        tail, tail_name = [(s["lat"], s["lon"])], "Stand"
     elif end_point:
-        n = g.nearest(end_point[0], end_point[1])
-        if not stops or stops[-1] != n:
-            stops.append(n)
+        add(net.stop(end_point[0], end_point[1]))
         tail = [(end_point[0], end_point[1])]
     if len(stops) < 2:
         raise HTTPException(400, "Cliquez au moins un point de destination sur les voies de circulation.")
     seq = [stops[0]]
     for a, b in zip(stops, stops[1:]):
-        seq += g.shortest(a, b)[1:]
-    pts = head + [g.coords[n] for n in seq] + tail
-    seg = (["Stand" if not origin else ""] if head else []) + [g.edge_name(a, b) for a, b in zip(seq, seq[1:])] + ([tail_name] if tail else [])
+        came_from = seq[-2] if len(seq) >= 2 else None
+        try:
+            leg = g.route(a, b, net, came_from)  # pas de demi-tour au passage d'un point cliqué
+        except HTTPException:
+            leg = g.route(a, b, net)
+        seq += leg[1:]
+    raw_pts = head + [net.at(n) for n in seq] + tail
+    raw_seg = (["Stand" if not origin else ""] if head else []) + [net.name(a, b) for a, b in zip(seq, seq[1:])] + ([tail_name] if tail else [])
+    pts, seg = [raw_pts[0]], []
+    for p, name in zip(raw_pts[1:], raw_seg):  # a segment of no length has no direction: the nose would point north
+        if haversine_nm(pts[-1][0], pts[-1][1], p[0], p[1]) * 1852 >= 1.0:
+            pts.append(p)
+            seg.append(name)
+    if len(pts) < 2:
+        raise HTTPException(400, "Cliquez au moins un point de destination sur les voies de circulation.")
     names: list[str] = []
     for n in seg:
         if n and (not names or names[-1] != n):
             names.append(n)
     return {"airport": icao, "path": [list(p) for p in pts], "seg_names": seg, "names": names,
             "length_nm": round(cumulative(pts)[-1], 3)}
-
-
-# ---------- rejected take-off: vacate the runway by a chosen taxiway ----------
-
-def runway_exits(g: "Graph", rwy: dict, lat: float, lon: float, allow_behind: bool = True) -> list[dict]:
-    """Taxiways leaving this runway, nearest first.
-    `allow_behind=True` (défaut) : sorties derrière l'avion acceptées (arrivée / remise en position).
-    """
-    from lib.runways import project_on_runway
-    k = math.cos(math.radians(lat))
-    hx, hy = math.sin(math.radians(rwy["hdg"])), math.cos(math.radians(rwy["hdg"]))
-    out: dict[int, dict] = {}
-    for n, (la, lo) in g.coords.items():
-        if not any(g.kind.get((n, v)) == "runway" for v, _, _ in g.adj[n]) or \
-                haversine_nm(la, lo, *project_on_runway(rwy, la, lo)) > 0.05:
-            continue  # not on this runway's centreline (as drawn on the map)
-        names = [nm for v, _, nm in g.adj[n] if g.kind.get((n, v)) != "runway"]
-        if not names:
-            continue
-        along = ((lo - lon) * k * hx + (la - lat) * hy) * 60.0  # NM along the take-off direction
-        if not allow_behind and along < -0.03:
-            continue  # behind the aircraft (rejected take-off: only forward exits)
-        name = next((x for x in names if x), "") or "Sortie"
-        # strip legacy « (2) » suffixes from OSM-derived names
-        name = re.sub(r"\s*\(\d+\)\s*$", "", name).strip() or name
-        out[n] = {
-            "node": n, "name": name, "lat": la, "lon": lo,
-            "dist_m": round(along * 1852),  # négatif = derrière
-            "behind": along < -0.03,
-        }
-    return sorted(out.values(), key=lambda e: abs(e["dist_m"]))
-
-
-def vacate_path(g: "Graph", icao: str, origin: tuple[float, float], exit_node: int, target_node: int,
-                tail: tuple[float, float] | None = None, tail_name: str = "Stand") -> dict:
-    """Aircraft on the runway -> along the runway to the chosen exit -> taxiways -> target node (+ stand point)."""
-    o = g.nearest(*origin)
-    seq = g.shortest(o, exit_node)
-    seq += g.shortest(exit_node, target_node)[1:]
-    pts = [origin] + [g.coords[n] for n in seq] + ([tail] if tail else [])
-    seg = [""] + [g.edge_name(a, b) for a, b in zip(seq, seq[1:])] + ([tail_name] if tail else [])
-    names: list[str] = []
-    for n in seg:
-        if n and (not names or names[-1] != n):
-            names.append(n)
-    return {"airport": icao, "path": [list(p) for p in pts], "seg_names": seg, "names": names,
-            "length_nm": round(cumulative(pts)[-1], 3), "points": [], "rejected": True}

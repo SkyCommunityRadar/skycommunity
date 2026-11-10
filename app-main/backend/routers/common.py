@@ -11,7 +11,7 @@ from lib.security import security_settings
 from lib.discord_roles import access_fields, access_of, has_any_access
 from lib.events import log_event
 from lib.control import Ctx, ctx_for
-from lib.engine import ACTIONS, ACTIVE, step_for, TAXI_PHASES, aware, holding_info, allowed_actions, compute_position, procedures, rebase, snap_distance, utcnow
+from lib.engine import REJECT_WINDOW_S, ACTIONS, ACTIVE, step_for, TAXI_PHASES, aware, holding_info, allowed_actions, compute_position, procedures, rebase, snap_distance, utcnow
 from lib.runways import change_runways, find as find_runway, runway_idents
 from models.schemas import Access, FlightDetail, FlightSummary, Position, TaxiRoute, UserOut
 
@@ -229,7 +229,7 @@ def detail(f: dict, user: dict, now: datetime, ctx: Ctx) -> FlightDetail:
         can_pick_holding=active and may_act and f["phase"] in ("preparation", "repoussage"),
         holding=holding_info(f, now),
         can_nav=active and (may_act or user["role"] == "admin") and f["phase"] in ("en_route", "approche"),
-        reject_until=(aware(f.get("takeoff_at")) + timedelta(seconds=60)) if f["phase"] == "decollage" and f.get("takeoff_at") else None,
+        reject_until=(aware(f.get("takeoff_at")) + timedelta(seconds=REJECT_WINDOW_S)) if f["phase"] == "decollage" and f.get("takeoff_at") else None,
         takeoff_cleared=bool(f.get("takeoff_cleared")) and f["phase"] == "alignement",
         lineup=(f.get("lineup") or {}).get("path") if f["phase"] in ("alignement", "decollage") else None,
         can_edit_profile=active and (owner or may_act) and f["phase"] not in ("parking", "roulage_arrivee", "atterrissage"),

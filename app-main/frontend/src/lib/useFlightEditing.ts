@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { MapMode } from "@/components/AtcControls";
 import type { MapTaxi } from "@/components/RadarMap";
-import { apiGet, apiPost, apiPut } from "@/lib/api";
+import { apiPost, apiPut } from "@/lib/api";
 import { useFlightMutation } from "@/lib/hooks";
 import type { FlightDetail, Ground, Holding } from "@/lib/types";
 
@@ -15,7 +14,7 @@ export const isLiveTaxi = (f: FlightDetail, kind: "taxi_out" | "taxi_in") =>
   kind === "taxi_out" ? f.phase === "roulage" || f.phase === "point_attente" : f.phase === "roulage_arrivee";
 
 /** Is this click on the airport, at most `maxM` metres from one of its taxiways / runways? */
-function nearGround(g: Ground, lat: number, lon: number, maxM = 150): boolean {
+function nearGround(g: Ground, lat: number, lon: number, maxM = 60): boolean {
   const kx = 111_320 * Math.cos((lat * Math.PI) / 180), ky = 110_540;
   for (const line of g.lines) {
     for (let i = 0; i + 1 < line.path.length; i++) {
@@ -38,20 +37,20 @@ export interface FlightEditing {
   editingKind: "taxi_out" | "taxi_in" | null;
   startEdit: (kind: "taxi_out" | "taxi_in") => void;
   togglePickHolding: () => void;
-  /** stand chosen by clicking it on the map; with `onPick` the stand is handed back instead of being saved */
-  startGatePick: (side: "dep" | "arr", onPick?: (ref: string) => void) => void;
-  /** departure taxi: holding point the route goes to */
+  /** stand chosen by clicking it on the map */
+  startGatePick: (side: "dep" | "arr") => void;
+  /** take-off interrupted: the route is clicked from the exit taxiway to the new holding point or stand */
+  startReject: (to: "hold" | "gate") => void;
+  stopReject: () => void;
+  /** holding point the route goes to */
   destination: HoldingDest | null;
-  pickPoints?: { id: string; lat: number; lon: number; label: string; selected?: boolean }[];
-  onPickPoint: (id: string) => void;
+  /** stand clicked as the last point of the route */
+  destGate: string | null;
+  /** stands to highlight instead of the flight's own while a route is drawn */
+  gateHighlight: string[] | null;
   /** pushback: the nose direction is chosen, now the end point is clicked on the map */
   startPushback: (dir: string, label: string) => void;
   pushLabel: string | null;
-  /** generic pick on the map (runway exit after an interrupted take-off) */
-  pick: { points: { id: string; lat: number; lon: number; label: string }[]; selected: string | null; title: string } | null;
-  startPick: (points: { id: string; lat: number; lon: number; label: string }[], title: string) => void;
-  setPicked: (id: string | null) => void;
-  stopPick: () => void;
   /** map props */
   taxis: MapTaxi[];
   draftPoints?: number[][];
@@ -75,9 +74,8 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
   const [draftPath, setDraftPath] = useState<number[][]>([]);
   const [focusKey, setFocusKey] = useState("init");
   const [push, setPush] = useState<{ dir: string; label: string } | null>(null);
-  const [pick, setPick] = useState<FlightEditing["pick"]>(null);
   const [destination, setDestination] = useState<HoldingDest | null>(null);
-  const gatePickCb = useRef<((ref: string) => void) | null>(null);
+  const [destGate, setDestGate] = useState<string | null>(null);
   const id = f?.id;
   useEffect(() => {
     // another flight selected: leave any edition in progress
@@ -85,29 +83,25 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
     setPoints([]);
     setDraftPath([]);
     setDestination(null);
+    setDestGate(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const editingKind = mode === "taxi_out" || mode === "taxi_in" ? mode : null;
-  const taxis: MapTaxi[] = [];
-  if (f?.taxi_out && editingKind !== "taxi_out") taxis.push({ path: f.taxi_out.path, status: "valide" });
-  if (f?.taxi_in && editingKind !== "taxi_in") taxis.push({ path: f.taxi_in.path, status: "valide" });
-  if (editingKind && draftPath.length > 1) taxis.push({ path: draftPath, status: "brouillon" });
-
+  const rejecting = mode === "reject_hold" || mode === "reject_gate";
+  const drawing = !!editingKind || rejecting;
   const gateMode = mode === "gate_dep" || mode === "gate_arr";
-  const gateOf = editingKind === "taxi_out" ? f?.dep_gate : editingKind === "taxi_in" ? f?.arr_gate : null;
-  const pickExits = mode === "taxi_in" && !!f && !isLiveTaxi(f, "taxi_in");
-  const exitsQ = useQuery<{ exits: { node: number; name: string; lat: number; lon: number }[] }>({
-    queryKey: ["arrival-exits", id, f?.arr_rwy],
-    queryFn: () => apiGet(`/flights/${id}/arrival-exits`),
-    enabled: pickExits,
-    staleTime: 60_000,
-    retry: false,
-  });
-  const exits = pickExits && points.length === 0 ? exitsQ.data?.exits ?? [] : [];
+  const drawingIcao = editingKind === "taxi_in" ? f?.arrival : f?.departure;
+  const taxis: MapTaxi[] = [];
+  if (f?.taxi_out && editingKind !== "taxi_out" && !rejecting) taxis.push({ path: f.taxi_out.path, status: "valide" });
+  if (f?.taxi_in && editingKind !== "taxi_in") taxis.push({ path: f.taxi_in.path, status: "valide" });
+  if (drawing && draftPath.length > 1) taxis.push({ path: draftPath, status: "brouillon" });
+
+  const gateOf = editingKind === "taxi_out" ? f?.dep_gate : null;
+  const lastPoint = f?.route[f.route.length - 1];
   const focusAt: [number, number] | null =
-    mode === "pick" && pick?.points[0]
-      ? [pick.points[0].lat, pick.points[0].lon]
+    rejecting && f
+      ? [f.position.lat, f.position.lon]
       : (mode === "holding" || mode === "pushback") && f
       ? f.dep_gate
         ? [f.dep_gate.lat, f.dep_gate.lon]
@@ -118,8 +112,8 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
         ? mode === "gate_dep"
           ? f.dep_gate ? [f.dep_gate.lat, f.dep_gate.lon] : dep ? [dep.lat, dep.lon] : null
           : f.arr_gate ? [f.arr_gate.lat, f.arr_gate.lon] : arr ? [arr.lat, arr.lon] : null
-      : pickExits && f
-        ? [f.route[f.route.length - 1].lat, f.route[f.route.length - 1].lon] // on the arrival runway, where the exits are
+      : editingKind === "taxi_in" && lastPoint
+        ? [lastPoint.lat, lastPoint.lon] // on the arrival runway, where the exit taxiways start
       : editingKind && gateOf
         ? [gateOf.lat, gateOf.lon]
         : null;
@@ -134,7 +128,9 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
       if (Math.abs(last[0] - hp.lat) < 1e-5 && Math.abs(last[1] - hp.lon) < 1e-5) pts = pts.slice(0, -1);
     }
     setPoints(pts);
+    setDraftPath([]);
     setDestination(hp);
+    setDestGate(null); // arrival: the stand is clicked again, as the last point of the route
     setMode(kind);
     setFocusKey(`${kind}-${Date.now()}`);
   };
@@ -142,22 +138,29 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
     setMode((cur) => (cur === "holding" ? "view" : "holding"));
     setFocusKey(`holding-${Date.now()}`);
   };
-  const startPick = (points: { id: string; lat: number; lon: number; label: string }[], title: string) => {
-    setPick({ points, selected: null, title });
-    setMode("pick");
-    if (points[0]) setFocusKey(`pick-${Date.now()}`);
-  };
-  const setPicked = (id: string | null) => setPick((p) => (p ? { ...p, selected: id } : p));
-  const stopPick = () => {
-    setPick(null);
-    gatePickCb.current = null;
-    setMode((m) => (m === "pick" || m === "gate_dep" || m === "gate_arr" ? "view" : m));
-  };
-  const startGatePick = (side: "dep" | "arr", onPick?: (ref: string) => void) => {
-    setPick(null);
-    gatePickCb.current = onPick ?? null;
+  const startGatePick = (side: "dep" | "arr") => {
     setMode(side === "dep" ? "gate_dep" : "gate_arr");
     setFocusKey(`gate-${side}-${Date.now()}`);
+  };
+  const startReject = (to: "hold" | "gate") => {
+    setPoints([]);
+    setDraftPath([]);
+    setDestination(null);
+    setDestGate(null);
+    setMode(to === "hold" ? "reject_hold" : "reject_gate");
+    setFocusKey(`reject-${Date.now()}`);
+  };
+  const stopReject = () => {
+    setPoints([]);
+    setDraftPath([]);
+    setDestination(null);
+    setDestGate(null);
+    setMode((cur) => (cur === "reject_hold" || cur === "reject_gate" ? "view" : cur));
+  };
+  const startPushback = (dir: string, label: string) => {
+    setPush({ dir, label });
+    setMode("pushback");
+    setFocusKey(`pushback-${Date.now()}`);
   };
   const saveGate = (ref: string) => {
     if (!f) return;
@@ -173,11 +176,6 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
       },
       { onSuccess: () => setMode("view") },
     );
-  };
-  const startPushback = (dir: string, label: string) => {
-    setPush({ dir, label });
-    setMode("pushback");
-    setFocusKey(`pushback-${Date.now()}`);
   };
   const pickHolding = (h: Holding) => {
     if (!f) return;
@@ -201,21 +199,19 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
       toast.info(tr("Cliquez directement sur un point d'attente (cercle orange)."));
       return;
     }
-    if (mode === "pick") {
-      toast.info(tr("Cliquez directement sur un des cercles orange."));
-      return;
-    }
     if (gateMode) {
       toast.info(tr("Cliquez directement sur un poste de l'aéroport."));
       return;
     }
     // Roulage : uniquement sur les voies de l'aéroport concerné
-    if (editingKind) {
-      const g = editingKind === "taxi_out" ? dep : arr;
+    if (drawing) {
+      const g = editingKind === "taxi_in" ? arr : dep;
       if (g && !nearGround(g, lat, lon)) {
         toast.info(tr("Point hors de l'aéroport : cliquez sur une voie de {0}.", [g.icao]));
         return;
       }
+      setPoints([...points, [Number(lat.toFixed(6)), Number(lon.toFixed(6))]]);
+      return;
     }
     if (mode === "pushback" && push) {
       const cur = f;
@@ -230,10 +226,6 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
         },
         { onSuccess: () => { setMode("view"); setPush(null); } },
       );
-      return;
-    }
-    if (editingKind) {
-      setPoints([...points, [Number(lat.toFixed(6)), Number(lon.toFixed(6))]]);
       return;
     }
     if (mode !== "snap" && mode !== "free") return;
@@ -256,32 +248,24 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
         : null;
 
   return {
-    mode, setMode, points, setPoints, setDraftPath, editingKind, startEdit, togglePickHolding, startPushback, startGatePick, destination,
-    pickPoints: pick
-      ? pick.points.map((x) => ({ ...x, selected: x.id === pick.selected }))
-      : exits.length > 0
-        ? exits.map((e) => ({ id: String(e.node), lat: e.lat, lon: e.lon, label: e.name }))
-        : undefined,
-    onPickPoint: (pointId) => {
-      const ex = exits.find((e) => String(e.node) === pointId);
-      if (ex) setPoints([[Number(ex.lat.toFixed(6)), Number(ex.lon.toFixed(6))]]);
-      else setPicked(pointId);
-    },
-    pushLabel: mode === "pushback" ? push?.label ?? null : null, taxis, pick, startPick, setPicked, stopPick,
-    draftPoints: editingKind ? points : undefined,
+    mode, setMode, points, setPoints, setDraftPath, editingKind, startEdit, togglePickHolding, startGatePick, startReject, stopReject,
+    startPushback, destination, destGate,
+    gateHighlight: editingKind === "taxi_in" || mode === "reject_gate" ? (destGate ? [destGate] : []) : null,
+    pushLabel: mode === "pushback" ? push?.label ?? null : null, taxis,
+    draftPoints: drawing ? points : undefined,
     onMapClick,
     onHoldingClick:
       mode === "holding" && f?.can_pick_holding
         ? (_icao, h) => pickHolding(h)
-        : editingKind === "taxi_out"
+        : editingKind === "taxi_out" || mode === "reject_hold"
           ? (icao, h) => {
               if (icao === f?.departure) setDestination({ ref: h.ref, lat: h.lat, lon: h.lon });
             }
           : undefined,
-    onTaxiwayClick: editingKind
+    onTaxiwayClick: drawing
       ? (icao, lat, lon, _name) => {
-          if (icao !== (editingKind === "taxi_out" ? f?.departure : f?.arrival)) {
-            toast.info(tr("Point hors de l'aéroport : cliquez sur une voie de {0}.", [editingKind === "taxi_out" ? f?.departure : f?.arrival]));
+          if (icao !== drawingIcao) {
+            toast.info(tr("Point hors de l'aéroport : cliquez sur une voie de {0}.", [drawingIcao]));
             return;
           }
           setPoints([...points, [Number(lat.toFixed(6)), Number(lon.toFixed(6))]]);
@@ -293,12 +277,19 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
             toast.info(tr("Ce poste n'est pas sur l'aéroport du vol."));
             return;
           }
-          if (gatePickCb.current) gatePickCb.current(ref);
-          else saveGate(ref);
+          saveGate(ref);
         }
-      : undefined,
+      : editingKind === "taxi_in" || mode === "reject_gate"
+        ? (icao, ref) => {
+            if (icao !== drawingIcao) {
+              toast.info(tr("Ce poste n'est pas sur l'aéroport du vol."));
+              return;
+            }
+            setDestGate(ref);
+          }
+        : undefined,
     // Crosshair pendant tout mode d'édition (y compris après clic taxiway)
-    crosshair: mode !== "view" && mode !== "holding" && mode !== "pick" && !gateMode,
+    crosshair: mode !== "view" && mode !== "holding" && !gateMode,
     pushHint,
     focusAt, focusKey,
     banner:
@@ -306,14 +297,14 @@ export function useFlightEditing(f: FlightDetail | null | undefined, dep?: Groun
         ? null
         : mode === "holding"
           ? tr("Choisissez le point d'attente : cliquez un cercle orange")
-          : mode === "pick"
-            ? pick?.title ?? tr("Cliquez sur la carte")
           : mode === "pushback"
             ? tr("Repoussage (nez vers le {0}) : cliquez où l'avion doit s'arrêter", [push?.label.toLowerCase() ?? "…"])
           : gateMode
             ? tr("Cliquez sur le poste de stationnement, directement sur la carte")
-          : editingKind === "taxi_in" && pickExits && points.length === 0
-            ? tr("Roulage arrivée : cliquez la sortie de piste (cercles orange)")
+          : editingKind === "taxi_in" || rejecting
+            ? points.length === 0
+              ? tr("Cliquez le taxiway de sortie de piste")
+              : tr("Cliquez les voies suivantes, jusqu'à la destination")
             : editingKind
             ? tr("Tracé du roulage : cliquez les voies dans l'ordre, point par point")
             : tr("Cliquez sur la carte pour positionner l'avion"),

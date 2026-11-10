@@ -107,17 +107,15 @@ function RouteRow({ f, kind, ed }: { f: FlightDetail; kind: "taxi_out" | "taxi_i
   const canEdit = out ? f.can_edit_taxi_out : f.can_edit_taxi_in;
   const gate = out ? f.dep_gate?.ref : f.arr_gate?.ref;
   const names = (t?.names ?? []).filter((n) => n && n !== "Stand");
-  const arrGround = useGround(out ? undefined : f.arrival);
-  const needGate = !out && !gate && (arrGround.data?.gates.length ?? 1) > 0; // arrival: the stand first, then the exit
   const action = canEdit && !editing && (
-    <Button size="sm" variant="outline" disabled={needGate} title={needGate ? tr("Choisissez d'abord le poste d'arrivée") : undefined} onClick={() => ed.startEdit(kind)} data-testid={`taxi-${kind}-edit`}>
+    <Button size="sm" variant="outline" onClick={() => ed.startEdit(kind)} data-testid={`taxi-${kind}-edit`}>
       <Pencil className="h-3.5 w-3.5" /> {t ? tr("Modifier") : tr("Tracer")}
     </Button>
   );
   return (
     <Row label={tr("Roulage")} action={action}>
       {editing ? (
-        <TaxiEditor flight={f} kind={kind} editing points={ed.points} setPoints={ed.setPoints} onPreview={ed.setDraftPath} onEdit={() => ed.startEdit(kind)} onDone={() => ed.setMode("view")} destination={out ? ed.destination : null} />
+        <TaxiEditor flight={f} kind={kind} editing points={ed.points} setPoints={ed.setPoints} onPreview={ed.setDraftPath} onEdit={() => ed.startEdit(kind)} onDone={() => ed.setMode("view")} destination={out ? ed.destination : null} destGate={out ? null : ed.destGate} />
       ) : t ? (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-1" data-testid={`taxi-${kind}-path`}>
@@ -137,7 +135,7 @@ function RouteRow({ f, kind, ed }: { f: FlightDetail; kind: "taxi_out" | "taxi_i
         <span className="text-muted-foreground" data-testid={`taxi-${kind}-empty`}>
           {out
             ? f.can_pick_holding ? tr("Pas encore de roulage : choisissez votre point d'attente.") : tr("Pas encore de roulage.")
-            : needGate ? tr("Choisissez d'abord le poste d'arrivée, puis la sortie de piste.") : tr("Pas encore de roulage jusqu'au poste.")}
+            : tr("Pas encore de roulage jusqu'au poste.")}
         </span>
       )}
     </Row>

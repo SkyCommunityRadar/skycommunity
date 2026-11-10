@@ -11,6 +11,7 @@ export default function PositionNudge({ flight: f }: { flight: FlightDetail }) {
   const track = f.position.track;
   if (!track || f.position.total_nm <= 0) return null;
   const air = track === "air";
+  const inHold = air && !!f.holding?.entered;
   // on the ground the steps are round distances in metres (40 m / 200 m), not 0.02 NM = 37 m
   const M = 1 / 1852;
   const small = air ? 5 : 40 * M;
@@ -21,10 +22,10 @@ export default function PositionNudge({ flight: f }: { flight: FlightDetail }) {
   const seg = "flex h-8 flex-1 items-center justify-center gap-1 whitespace-nowrap px-2 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50";
   return (
     <div className="space-y-1.5" data-testid="position-nudge">
-      <div className="text-[11px] text-muted-foreground">{air ? tr("Sur la route") : tr("Sur le roulage")}</div>
+      <div className="text-[11px] text-muted-foreground">{inHold ? tr("Dans le hold") : air ? tr("Sur la route") : tr("Sur le roulage")}</div>
       <div className="flex divide-x divide-border overflow-hidden rounded-lg border border-border bg-background/40">
         {air && (
-          <button className={seg} disabled={m.isPending} onClick={() => send({ waypoint: "prev" })} data-testid="nudge-prev-wp" title={tr("Point préc.")}>
+          <button className={seg} disabled={m.isPending} onClick={() => send({ waypoint: "prev" })} data-testid="nudge-prev-wp" title={inHold ? tr("Tour précédent") : tr("Point préc.")}>
             <SkipBack className="h-3 w-3" />
           </button>
         )}
@@ -41,12 +42,12 @@ export default function PositionNudge({ flight: f }: { flight: FlightDetail }) {
           {fmt(big)} <ChevronsRight className="h-3 w-3" />
         </button>
         {air && (
-          <button className={seg} disabled={m.isPending} onClick={() => send({ waypoint: "next" })} data-testid="nudge-next-wp" title={tr("Point suiv.")}>
+          <button className={seg} disabled={m.isPending} onClick={() => send({ waypoint: "next" })} data-testid="nudge-next-wp" title={inHold ? tr("Tour suivant") : tr("Point suiv.")}>
             <SkipForward className="h-3 w-3" />
           </button>
         )}
       </div>
-      <p className="text-[10px] text-muted-foreground">{air ? tr("Reculer ou avancer l'avion sur sa route (⏮ ⏭ : point précédent / suivant).") : tr("Reculer ou avancer l'avion sur son roulage.")}</p>
+      <p className="text-[10px] text-muted-foreground">{inHold ? tr("Reculer ou avancer l'avion dans le hold (⏮ ⏭ : tour précédent / suivant). Il ne sort du hold que si la sortie a été demandée.") : air ? tr("Reculer ou avancer l'avion sur sa route (⏮ ⏭ : point précédent / suivant).") : tr("Reculer ou avancer l'avion sur son roulage.")}</p>
     </div>
   );
 }

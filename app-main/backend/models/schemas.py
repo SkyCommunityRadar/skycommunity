@@ -313,9 +313,11 @@ class ActionIn(BaseModel):
     version: int
     pushback_dir: Literal["N", "NE", "E", "SE", "S", "SW", "W", "NW"] | None = None
     pushback_to: LatLon | None = None  # where the tug leaves the aircraft (clicked on the map)
-    # take-off interrupted: taxiway used to vacate the runway, then the new holding point or the stand
-    exit_node: int | None = None
+    # take-off interrupted: points clicked from the exit taxiway on, then the new holding point or the stand
+    taxi_points: list[list[float]] = Field(default_factory=list, max_length=30)
     holding_ref: str | None = Field(default=None, max_length=40)
+    holding_lat: float | None = Field(default=None, ge=-90, le=90)
+    holding_lon: float | None = Field(default=None, ge=-180, le=180)
     gate_ref: str | None = Field(default=None, max_length=40)
 
 
@@ -333,6 +335,7 @@ class TaxiIn(BaseModel):
     kind: Literal["taxi_out", "taxi_in"]
     points: list[list[float]] = Field(default_factory=list, max_length=30)
     version: int
+    gate_ref: str | None = Field(default=None, max_length=40)  # arrival: the stand clicked as the last point
     # destination of a departure taxi, clicked on the map (omitted: the holding point already chosen)
     holding_ref: str | None = Field(default=None, max_length=30)
     holding_lat: float | None = Field(default=None, ge=-90, le=90)

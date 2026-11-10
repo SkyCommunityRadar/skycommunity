@@ -6,7 +6,7 @@ and a simulated speed profile. Browsers never advance aircraft; they only read t
 
 import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from lib.geo import cumulative, interp, locate, project, haversine_nm
 from lib.runways import project_on_runway
@@ -261,6 +261,13 @@ def compute_position(f: dict, now: datetime) -> dict:
             lat, lon, hdg, idx = locate(pts, cum, d)
             if track == "lineup" and cum and d >= cum[-1] - 0.001:
                 hdg = float(f["lineup"].get("hdg", hdg))  # lined up: nose along the runway
+            rw = route[0].get("rwy")
+            if track == "taxi_out" and f["phase"] == "point_attente" and rw:
+                # au point d'attente, le nez regarde vers la suite : la piste
+                from lib.runways import bearing
+                on = project_on_runway(rw, lat, lon)
+                if haversine_nm(lat, lon, on[0], on[1]) > 0.005:
+                    hdg = bearing(lat, lon, on[0], on[1])
             seg = f[track].get("seg_names", [])
             prev_wp = (seg[idx] if idx < len(seg) else None) or None
             next_wp = next((n for n in seg[idx + 1:] if n and n != prev_wp), None)
@@ -858,6 +865,26 @@ def reconcile_holding(f: dict, new_dist: float, now: datetime) -> str | None:
         add_hold_time(f, now)
         h.update(entered_at=None, exit=False, turns_done_logged=False)
         return f"retour vers le hold sur {h['ident']}"
+    return None
+
+
+def nudge_in_hold(f: dict, delta_nm: float | None, laps: int, now: datetime) -> str | None:
+    """Avancer / reculer un avion EN hold le déplace SUR l'hippodrome, jamais sur la route initiale. Il ne quitte le
+    hold que si une sortie a été demandée et que l'avance atteint le moment de cette sortie."""
+    h = f["holding"]
+    entered = hold_entered_at(f, now)
+    secs = laps * hold_lap_s(h) if laps else float(delta_nm or 0) / h["speed_kt"] * 3600.0
+    at = leave_holding_at(f, now)
+    if secs > 0 and at is not None and secs >= (at - now).total_seconds():
+        extra_nm = (secs - (at - now).total_seconds()) * h["speed_kt"] / 3600.0
+        ident, fix = h["ident"], h["fix_nm"]
+        end_holding(f, now)
+        f["progress"]["anchor_dist"] = min(fix + extra_nm, track_length(f, "air"))
+        return f"sortie du hold sur {ident}"
+    elapsed = max(0.0, (now - entered).total_seconds() + secs)
+    h["entered_at"] = now - timedelta(seconds=elapsed)
+    if h.get("turns") and elapsed < h["turns"] * hold_lap_s(h):
+        h["turns_done_logged"] = False
     return None
 
 

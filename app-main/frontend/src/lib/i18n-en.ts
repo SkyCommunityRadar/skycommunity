@@ -1,6 +1,20 @@
 // English translation of the interface — downloaded only by someone who picks English (lib/i18n.ts).
 // Key = the French text written in the code. Generated from the code, then checked by hand.
 export const EN: Record<string, string> = {
+  "Cliquez le taxiway de sortie de piste": "Click the runway exit taxiway",
+  "Cliquez les voies suivantes, jusqu'à la destination": "Click the next taxiways, up to the destination",
+  "à {0}, cliquez le taxiway de sortie, puis les voies suivantes jusqu'à la porte.": "at {0}, click the exit taxiway, then the next taxiways up to the stand.",
+  "L'avion roule : le nouveau tracé part de sa position. Cliquez les voies à emprunter, puis la porte d'arrivée.": "The aircraft is taxiing: the new route starts from its position. Click the taxiways, then the arrival stand.",
+  "Cliquez d'abord le taxiway de sortie de piste, puis les voies suivantes dans l'ordre, et terminez en cliquant la porte d'arrivée.": "First click the runway exit taxiway, then the next taxiways in order, and finish by clicking the arrival stand.",
+  "Porte d'arrivée : pas encore cliquée": "Arrival stand: not clicked yet",
+  "Sortie choisie.": "Exit chosen.",
+  "Dans le hold": "In the hold",
+  "Tour précédent": "Previous lap",
+  "Tour suivant": "Next lap",
+  "Reculer ou avancer l'avion dans le hold (⏮ ⏭ : tour précédent / suivant). Il ne sort du hold que si la sortie a été demandée.": "Move the aircraft back or forward in the hold (⏮ ⏭: previous / next lap). It only leaves the hold if the exit was requested.",
+  "Cliquez le taxiway de sortie, les voies suivantes dans l'ordre, puis le nouveau point d'attente (cercle orange).": "Click the exit taxiway, the next taxiways in order, then the new holding point (orange circle).",
+  "Cliquez le taxiway de sortie, les voies suivantes dans l'ordre, puis le poste de stationnement.": "Click the exit taxiway, the next taxiways in order, then the stand.",
+  "Destination : pas encore cliquée": "Destination: not clicked yet",
   "Roulage à l'arrivée :": "Arrival taxi:",
   "choisissez la sortie de piste à {0}, le tracé jusqu'au poste {1} sera automatique.": "choose the runway exit at {0}, the route to stand {1} will be automatic.",
   "choisissez d'abord votre poste à {0}, puis la sortie de piste.": "choose your stand at {0} first, then the runway exit.",

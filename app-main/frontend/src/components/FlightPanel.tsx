@@ -132,8 +132,8 @@ export default function FlightPanel({
             {f.can_edit_taxi_in && !f.taxi_in && ["en_route", "approche", "atterrissage"].includes(f.phase) && ed.mode !== "taxi_in" && ed.mode !== "gate_arr" && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs" data-testid="arrival-taxi-reminder">
                 <span className="min-w-0 flex-1 text-amber-100">
-                  <b>{tr("Roulage à l'arrivée :")}</b>{" "}{f.arr_gate ? tr("choisissez la sortie de piste à {0}, le tracé jusqu'au poste {1} sera automatique.", [f.arrival, f.arr_gate.ref]) : tr("choisissez d'abord votre poste à {0}, puis la sortie de piste.", [f.arrival])}</span>
-                <Button size="sm" onClick={() => { setTab("taxi"); if (f.arr_gate) ed.startEdit("taxi_in"); else ed.startGatePick("arr"); }} data-testid="arrival-taxi-open">
+                  <b>{tr("Roulage à l'arrivée :")}</b>{" "}{tr("à {0}, cliquez le taxiway de sortie, puis les voies suivantes jusqu'à la porte.", [f.arrival])}</span>
+                <Button size="sm" onClick={() => { setTab("taxi"); ed.startEdit("taxi_in"); }} data-testid="arrival-taxi-open">
                   <MapPin className="h-3.5 w-3.5" />{" "}{tr("Ouvrir le roulage")}</Button>
               </div>
             )}
