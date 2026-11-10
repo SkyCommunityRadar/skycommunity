@@ -438,6 +438,7 @@ export interface AtcPosition {
   id: string;
   callsign: string;
   type: string;
+  languages?: string | null; // « 🇫🇷 FR », « 🇬🇧 EN », « 🇫🇷🇬🇧 FR / EN »
   frequency: string;
   controller: string;
   airport: string | null;

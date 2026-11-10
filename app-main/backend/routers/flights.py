@@ -12,7 +12,7 @@ from models.schemas import (NavIn, ProfileMarkerIn, TaxiStopIn, RunwaysIn, Actio
                             NoteIn, NudgeIn, StepIn, TaxiIn)
 from routers.atc import heartbeat as atc_heartbeat
 from lib.control import ctx_for
-from routers.common import apply_runway_change, ensure_control, check_version, detail, detail_for, load_flight, save, summary
+from routers.common import delete_flights_data, apply_runway_change, ensure_control, check_version, detail, detail_for, load_flight, save, summary
 
 router = APIRouter(prefix="/flights", tags=["flights"])
 ATC_GAP_S = 120  # polling gaps longer than this end a controlling session
@@ -749,8 +749,6 @@ async def delete_flight(flight_id: str, user: dict = Depends(require("admin:flig
     """Administrators and the creator: removes the flight for good (unlike « Annuler », which keeps it in the
     history), with its reviews and pending handovers. Its journal entries stay in the global log."""
     f = await load_flight(flight_id)
-    await db.flights.delete_one({"id": flight_id})
-    await db.reviews.delete_many({"flight_id": flight_id})
-    await db.atc_handovers.delete_many({"flight_id": flight_id})
+    await delete_flights_data([flight_id])
     await log_event("admin", "Suppression du vol", user, None, f"{f['callsign']} ({f['departure']} → {f['arrival']}, pilote {f['pilot_name']})")
     return {"ok": True}

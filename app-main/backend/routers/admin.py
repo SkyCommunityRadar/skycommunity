@@ -12,7 +12,7 @@ from lib.events import log_event
 from lib.security import NEW_ACCOUNT_HOURS, security_settings, set_lockdown
 from pydantic import BaseModel, Field
 from models.schemas import AdminUserPatch, FlightEvent, UserOut
-from routers.common import user_out
+from routers.common import delete_flights_data, user_out
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -88,10 +88,7 @@ async def events(limit: int = Query(200, ge=1, le=1000), type: str | None = Quer
 # ---------- deletion (administrators and the creator only) ----------
 
 async def _delete_flights(ids: list[str]) -> None:
-    if ids:
-        await db.flights.delete_many({"id": {"$in": ids}})
-        await db.reviews.delete_many({"flight_id": {"$in": ids}})
-        await db.atc_handovers.delete_many({"flight_id": {"$in": ids}})
+    await delete_flights_data(ids)
 
 
 

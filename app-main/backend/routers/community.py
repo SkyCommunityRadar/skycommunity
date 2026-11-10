@@ -141,6 +141,7 @@ async def public_profile(user_id: str, user: dict = Depends(require("flight:read
     # which they acted as a controller
     controlled = set(await db.flights.distinct("id", {"controllers": user_id}))
     controlled |= set(await db.events.distinct("flight_id", {"actor_id": user_id, "actor_role": "atc", "flight_id": {"$ne": None}}))
+    controlled &= set(await db.flights.distinct("id", {"id": {"$in": list(controlled)}}))  # deleted flights no longer count
     # never exposes email, SimBrief Pilot ID, ban details, tokens or password data
     return PublicProfile(
         id=u["id"], display_name=u["display_name"], avatar_url=avatar_url(u), discord_username=u.get("discord_username"),
@@ -230,16 +231,9 @@ async def my_notifications(user: dict = Depends(require("flight:read"))):
             })
     except Exception:
         pass
-    # signalements ouverts concernant l'utilisateur (accusé)
-    async for s in db.reports.find({"status": "open", "target_id": user["id"]}, {"_id": 0}).sort("created_at", -1).limit(20):
-        items.append({
-            "id": f"report-{s['id']}",
-            "kind": "report",
-            "title": "Signalement reçu",
-            "body": s.get("reason") or s.get("category") or "",
-            "at": s.get("created_at"),
-            "href": "/signalements",
-        })
+    # signalements : reçus, clôturés (avec le mot de clôture), à traiter pour les responsables
+    from routers.reports import report_notifications
+    items += await report_notifications(user)
     # Fréquences ouvertes (info communauté)
     try:
         async for pos in db.atc_positions.find({"closed_at": None}, {"_id": 0}).limit(30):

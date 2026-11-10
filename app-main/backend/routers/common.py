@@ -255,6 +255,20 @@ async def detail_for(f: dict, user: dict, now: datetime | None = None) -> Flight
     return detail(f, user, now, await ctx_for(user, now))
 
 
+async def delete_flights_data(ids: list[str]) -> None:
+    """Removes flights for good, with everything that counted them: reviews, review reminders, pending handovers.
+    Hours, flight counts, ranking and profiles are computed from the remaining flights only. The journal keeps its
+    lines (history of what happened), but no counter reads a deleted flight from it."""
+    if not ids:
+        return
+    q = {"flight_id": {"$in": ids}}
+    await db.flights.delete_many({"id": {"$in": ids}})
+    await db.reviews.delete_many(q)
+    await db.review_snoozes.delete_many(q)
+    await db.review_dismissals.delete_many(q)
+    await db.atc_handovers.delete_many(q)
+
+
 async def load_flight(flight_id: str) -> dict:
     f = await db.flights.find_one({"id": flight_id}, {"_id": 0})
     if not f:

@@ -28,6 +28,15 @@ const fmtWhen = (iso: string) => {
 };
 
 const TYPE_LABEL: Record<string, string> = labels({ GND: "Sol", TWR: "Tour", APP: "Approche", CTR: "Centre" });
+
+const FLAG_OF: Record<string, string> = { FR: "🇫🇷", EN: "🇬🇧", ES: "🇪🇸", DE: "🇩🇪", IT: "🇮🇹" };
+/** Flags of the languages spoken on a frequency: « 🇫🇷🇬🇧 » when it is French and English. */
+function langFlags(s?: string | null): string {
+  if (!s) return "";
+  const flags = s.match(/\p{Regional_Indicator}{2}/gu);
+  if (flags?.length) return [...new Set(flags)].join("");
+  return [...new Set((s.toUpperCase().match(/\b(FR|EN|ES|DE|IT)\b/g) ?? []).map((c) => FLAG_OF[c]))].join("");
+}
 const AIRPORT_POSITIONS = ["APP", "TWR", "GND"] as const;
 const FREQ_RE = /^1(1[89]|2\d|3[0-6])\.\d{2,3}$/;
 
@@ -387,7 +396,9 @@ export default function AtcPositionPanel({ user, canOpen: allowed = true }: { us
             >
               <span className="min-w-0 truncate">
                 <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 sync-dot" />
-                <b className="text-[color:var(--sc-accent)]">{p.callsign}</b> <span className="text-muted-foreground">{TYPE_LABEL[p.type] ?? p.type}</span>
+                <b className="text-[color:var(--sc-accent)]">{p.callsign}</b>
+                {langFlags(p.languages) && <span className="ml-1 font-sans text-sm leading-none" title={p.languages ?? undefined} data-testid={`atc-langs-${p.callsign}`}>{langFlags(p.languages)}</span>}{" "}
+                <span className="text-muted-foreground">{TYPE_LABEL[p.type] ?? p.type}</span>
                 <span className="ml-1 font-sans text-[10px] text-muted-foreground">{p.controller}</span>
               </span>
               <span className="flex items-center gap-1.5">
